@@ -1,15 +1,15 @@
 # ============================================================================
 # حاوية بناء وتشغيل خادم الـ API (Afaq Backend Dockerfile)
 # ============================================================================
-FROM node:20-slim
+FROM node:20-bookworm-slim
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=5000
 
-# تثبيت متطلبات التشغيل
-COPY package*.json ./
+# نسخ ملف التعريف فقط وتثبيت الاعتماديات
+COPY package.json ./
 RUN npm install && npm install -g tsx
 
 # نسخ ملفات الخادم وقواعد البيانات والخدمات

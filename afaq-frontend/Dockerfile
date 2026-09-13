@@ -1,25 +1,26 @@
 # ============================================================================
 # حاوية بناء وتشغيل الواجهة الأمامية (Afaq Frontend Dockerfile)
 # ============================================================================
-# المرحلة 1: بناء ملفات React بواسطة Node.js (Debian Bookworm-slim)
+# المرحلة 1: بناء ملفات React بواسطة Node.js على بيئة Debian
 FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
 
-# نسخ ملفات الحزم
-COPY package*.json ./
+# نسخ ملف التعريف فقط لتجنب قيود أي lockfile قديم
+COPY package.json ./
 
-# تثبيت الحزم مع فرض تثبيت حزم التوافق لمعالجات ARM64 (Rollup binary)
-RUN npm install && npm install --save-optional @rollup/rollup-linux-arm64-gnu
+# تثبيت الحزم الأساسية بالإضافة لمكتبات التوافق الصريحة لمعمارية ARM64 (Rollup + LightningCSS)
+RUN npm install --include=optional && \
+    npm install --no-save @rollup/rollup-linux-arm64-gnu lightningcss-linux-arm64-gnu
 
-# نسخ ملفات المشروع وبناء واجهة المستخدم عبر Vite
+# نسخ كود المشروع وبناء الواجهة
 COPY . .
 RUN npx vite build
 
-# المرحلة 2: خادم Nginx عالي الأداء والسرعة لخدمة الملفات
+# المرحلة 2: خادم Nginx خفيف وعالي السرعة
 FROM nginx:alpine AS runner
 
-# نسخ ملفات React المبنية إلى مسار Nginx
+# نسخ ملفات الويب الجاهزة
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # نسخ إعدادات Nginx المخصصة لدعم التوجيه ومسارات /api/

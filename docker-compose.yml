@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: afaq_global_app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgres://afaq_user:ChangeMeSecurePassword123@db:5432/afaq_db
+    depends_on:
+      - db
+    networks:
+      - afaq_network
+
+  db:
+    image: postgres:16-alpine
+    container_name: afaq_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: afaq_user
+      POSTGRES_PASSWORD: ChangeMeSecurePassword123
+      POSTGRES_DB: afaq_db
+    volumes:
+      - afaq_pgdata:/var/lib/postgresql/data
+    networks:
+      - afaq_network
+
+volumes:
+  afaq_pgdata:
+
+networks:
+  afaq_network:
+    driver: bridge

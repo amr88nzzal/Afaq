@@ -1,0 +1,405 @@
+import React, { useState } from 'react';
+import { Language, DestinationCountry, StudyLevel } from '../types';
+import { 
+  GraduationCap, 
+  CheckCircle2, 
+  ArrowLeft, 
+  ArrowRight, 
+  Sparkles, 
+  Shield, 
+  Clock, 
+  Award,
+  ChevronRight,
+  Plane,
+  Building2,
+  FileCheck
+} from 'lucide-react';
+
+interface HeroSectionProps {
+  lang: Language;
+  theme?: 'light' | 'dark';
+  onOpenApplication: (prefillCountry?: DestinationCountry) => void;
+  onNavigateDestinations: (country?: DestinationCountry) => void;
+  onOpenCounselorBooking: () => void;
+}
+
+export const HeroSection: React.FC<HeroSectionProps> = ({
+  lang,
+  theme = 'dark',
+  onOpenApplication,
+  onNavigateDestinations,
+  onOpenCounselorBooking,
+}) => {
+  const isAr = lang === 'ar';
+  const isDark = theme === 'dark';
+  const ArrowIcon = isAr ? ArrowLeft : ArrowRight;
+
+  // Quick Calculator State
+  const [selectedCountry, setSelectedCountry] = useState<DestinationCountry>('uk');
+  const [selectedLevel, setSelectedLevel] = useState<StudyLevel>('bachelor');
+  const [gpaLevel, setGpaLevel] = useState<'high' | 'medium' | 'need_foundation'>('high');
+  const [englishLevel, setEnglishLevel] = useState<'has_ielts' | 'studying' | 'need_course'>('has_ielts');
+  const [calculatedResult, setCalculatedResult] = useState<boolean>(false);
+
+  const handleCalculate = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCalculatedResult(true);
+  };
+
+  return (
+    <section className="relative overflow-hidden bg-slate-950 text-white pt-10 pb-20 lg:pt-16 lg:pb-28">
+      {/* Background imagery with sophisticated dark overlay */}
+      <div className="absolute inset-0 z-0">
+        <img 
+          src="/src/assets/images/uk_university_campus_1789309583030.jpg" 
+          alt="Prestigious University Campus" 
+          className="w-full h-full object-cover object-center opacity-25 scale-105 transform filter saturate-125"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/85 to-slate-950/60" />
+        <div className="absolute -top-40 right-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-10 left-10 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+      </div>
+
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+          
+          {/* Main Hero Copy (7 cols) */}
+          <div className="lg:col-span-7 space-y-6 text-start">
+            {/* Prestige & 100% Free badge */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-800/90 border border-amber-500/30 text-amber-300 text-xs font-semibold backdrop-blur-md">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <span>
+                  {isAr 
+                    ? 'الوكيل المعتمد لجامعات بريطانيا (Russell Group) وأستراليا (Go8)' 
+                    : 'Official Representative for UK Russell Group & Australian Go8'}
+                </span>
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-black backdrop-blur-md">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>
+                  {isAr ? 'القبول الجامعي مجاني 100% وبدون أتعاب' : '100% Free University Placement'}
+                </span>
+              </div>
+            </div>
+
+            {/* Headline */}
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white leading-tight tracking-tight">
+              {isAr ? (
+                <>
+                  بوابتك الموثوقة لأعرق <br />
+                  <span className="bg-gradient-to-r from-amber-300 via-amber-400 to-amber-200 bg-clip-text text-transparent">
+                    الجامعات العالمية والابتعاث
+                  </span>
+                </>
+              ) : (
+                <>
+                  Your Fast-Track Gateway to <br />
+                  <span className="bg-gradient-to-r from-amber-300 via-amber-400 to-amber-200 bg-clip-text text-transparent">
+                    Premier Global Universities
+                  </span>
+                </>
+              )}
+            </h1>
+
+            {/* Subtext */}
+            <p className="text-base sm:text-lg text-slate-300 max-w-2xl leading-relaxed">
+              {isAr ? (
+                'نرافق طلاب الشرق الأوسط والخليج العربي خطوة بخطوة: تأمين القبولات غير المشروطة، معادلة الشهادات، استشارات المنح والابتعاث الحكومي، ومرافقة شاملة لإصدار التأشيرة الدراسية حتى وصولك لمقعدك الجامعي.'
+              ) : (
+                'Empowering GCC and Middle Eastern students with guaranteed conditional & unconditional university offers, visa assistance, and specialized government scholarship guidance for the UK, Australia, and New Zealand.'
+              )}
+            </p>
+
+            {/* Key Value Points */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+              <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                <Shield className="w-5 h-5 text-emerald-400 shrink-0" />
+                <div className="text-xs">
+                  <div className="font-bold text-white">{isAr ? 'قبولات رسمية 100%' : '100% Official Offers'}</div>
+                  <div className="text-slate-400 text-[11px]">{isAr ? 'عقود تمثيل جامعية مباشرة' : 'Direct university contracts'}</div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                <Award className="w-5 h-5 text-amber-400 shrink-0" />
+                <div className="text-xs">
+                  <div className="font-bold text-white">{isAr ? 'معتمد في دول الخليج' : 'GCC Accredited'}</div>
+                  <div className="text-slate-400 text-[11px]">{isAr ? 'متوافق مع شروط وزارات التعليم' : 'Ministry scholarship compliant'}</div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                <Clock className="w-5 h-5 text-blue-400 shrink-0" />
+                <div className="text-xs">
+                  <div className="font-bold text-white">{isAr ? 'إصدار سريع خلال 48-72 ساعة' : 'Fast 48-72h Turnaround'}</div>
+                  <div className="text-slate-400 text-[11px]">{isAr ? 'لبرامج اللغة والسنة التحضيرية' : 'For English & Foundation'}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center gap-4 pt-4">
+              <button
+                onClick={() => onOpenApplication()}
+                id="hero-apply-now-btn"
+                className="px-6 py-3.5 rounded-xl font-black text-sm bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400 hover:from-amber-300 hover:to-amber-400 text-slate-950 shadow-lg shadow-amber-500/25 flex items-center gap-2 transform transition-all hover:scale-105 active:scale-95 cursor-pointer"
+              >
+                <GraduationCap className="w-5 h-5" />
+                <span>{isAr ? 'ابدأ تقديم طلبك مجاناً' : 'Start Free Application'}</span>
+                <ArrowIcon className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={onOpenCounselorBooking}
+                id="hero-book-counselor-btn"
+                className="px-5 py-3.5 rounded-xl font-bold text-sm bg-slate-800/90 hover:bg-slate-700 text-slate-100 border border-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+              >
+                <span>{isAr ? 'تحدث مع مستشارك الأكاديمي' : 'Talk to an Advisor'}</span>
+              </button>
+            </div>
+
+            {/* Destination Quick Badges */}
+            <div className="pt-4 flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-slate-400">{isAr ? 'استكشف الوجهات الأكثر طلباً:' : 'Explore top study destinations:'}</span>
+              <button 
+                onClick={() => onNavigateDestinations('uk')} 
+                className="px-3 py-1 rounded-md bg-slate-800/70 hover:bg-slate-700 border border-slate-700 text-slate-200 transition-colors flex items-center gap-1.5"
+              >
+                <span>🇬🇧</span>
+                <span className="font-semibold">{isAr ? 'بريطانيا' : 'United Kingdom'}</span>
+              </button>
+              <button 
+                onClick={() => onNavigateDestinations('australia')} 
+                className="px-3 py-1 rounded-md bg-slate-800/70 hover:bg-slate-700 border border-slate-700 text-slate-200 transition-colors flex items-center gap-1.5"
+              >
+                <span>🇦🇺</span>
+                <span className="font-semibold">{isAr ? 'أستراليا' : 'Australia'}</span>
+              </button>
+              <button 
+                onClick={() => onNavigateDestinations('new_zealand')} 
+                className="px-3 py-1 rounded-md bg-slate-800/70 hover:bg-slate-700 border border-slate-700 text-slate-200 transition-colors flex items-center gap-1.5"
+              >
+                <span>🇳🇿</span>
+                <span className="font-semibold">{isAr ? 'نيوزيلندا' : 'New Zealand'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Eligibility & Admission Matcher Widget (5 cols) */}
+          <div className="lg:col-span-5">
+            <div className="bg-slate-900/90 border border-slate-700/80 rounded-2xl p-6 shadow-2xl backdrop-blur-xl relative">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                    <FileCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-white">
+                      {isAr ? 'حاسبة القبول والفرص الأكاديمية' : 'Quick Admission Matcher'}
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      {isAr ? 'تقييم فوري خلال 30 ثانية' : 'Instant 30-second eligibility check'}
+                    </p>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  {isAr ? 'مجاني 100%' : '100% Free'}
+                </span>
+              </div>
+
+              {!calculatedResult ? (
+                <form onSubmit={handleCalculate} className="space-y-4 text-start">
+                  {/* Destination Country */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                      {isAr ? '1. اختر الدولة التي ترغب بالدراسة فيها:' : '1. Target Study Destination:'}
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCountry('uk')}
+                        className={`p-2 rounded-lg text-xs font-bold border transition-all flex flex-col items-center gap-1 ${
+                          selectedCountry === 'uk'
+                            ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md'
+                            : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700'
+                        }`}
+                      >
+                        <span className="text-base">🇬🇧</span>
+                        <span>{isAr ? 'بريطانيا' : 'UK'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCountry('australia')}
+                        className={`p-2 rounded-lg text-xs font-bold border transition-all flex flex-col items-center gap-1 ${
+                          selectedCountry === 'australia'
+                            ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md'
+                            : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700'
+                        }`}
+                      >
+                        <span className="text-base">🇦🇺</span>
+                        <span>{isAr ? 'أستراليا' : 'Australia'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCountry('new_zealand')}
+                        className={`p-2 rounded-lg text-xs font-bold border transition-all flex flex-col items-center gap-1 ${
+                          selectedCountry === 'new_zealand'
+                            ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md'
+                            : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700'
+                        }`}
+                      >
+                        <span className="text-base">🇳🇿</span>
+                        <span>{isAr ? 'نيوزيلندا' : 'New Zealand'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Study Level */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                      {isAr ? '2. الدرجة العلمية المستهدفة:' : '2. Desired Degree Level:'}
+                    </label>
+                    <select
+                      value={selectedLevel}
+                      onChange={(e) => setSelectedLevel(e.target.value as StudyLevel)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg py-2.5 px-3 text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                    >
+                      <option value="bachelor">{isAr ? 'بكالوريوس (جامعي 3-4 سنوات)' : "Bachelor's Degree"}</option>
+                      <option value="master">{isAr ? 'ماجستير (سنة مكثفة في بريطانيا أو سنتين بأستراليا)' : "Master's Degree (1-2 yrs)"}</option>
+                      <option value="foundation">{isAr ? 'سنة تأسيسية وتحضيرية (Foundation)' : 'Foundation / Pathway Year'}</option>
+                      <option value="english_course">{isAr ? 'دورة لغة إنجليزية أكاديمية مكثفة' : 'Academic English Language Course'}</option>
+                      <option value="phd">{isAr ? 'دكتوراه وبحوث متقدمة (PhD)' : 'PhD / Research'}</option>
+                    </select>
+                  </div>
+
+                  {/* GPA / Academic Status */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                      {isAr ? '3. المعدل التراكمي التقريبي:' : '3. Academic Grade Level:'}
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setGpaLevel('high')}
+                        className={`py-2 px-2 rounded-lg text-[11px] font-bold border transition-all ${
+                          gpaLevel === 'high' 
+                            ? 'bg-blue-600 text-white border-blue-400' 
+                            : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                        }`}
+                      >
+                        {isAr ? 'ممتاز (85%+ أو 3.5+)' : 'Excellent (85%+)'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGpaLevel('medium')}
+                        className={`py-2 px-2 rounded-lg text-[11px] font-bold border transition-all ${
+                          gpaLevel === 'medium' 
+                            ? 'bg-blue-600 text-white border-blue-400' 
+                            : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                        }`}
+                      >
+                        {isAr ? 'جيد جداً (75-84%)' : 'Very Good (75-84%)'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGpaLevel('need_foundation')}
+                        className={`py-2 px-2 rounded-lg text-[11px] font-bold border transition-all ${
+                          gpaLevel === 'need_foundation' 
+                            ? 'bg-blue-600 text-white border-blue-400' 
+                            : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                        }`}
+                      >
+                        {isAr ? 'مقبول / يحتاج تمهيدي' : 'Pathway Needed'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* English Level */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                      {isAr ? '4. وضع اختبار اللغة الإنجليزية:' : '4. English Proficiency Status:'}
+                    </label>
+                    <select
+                      value={englishLevel}
+                      onChange={(e) => setEnglishLevel(e.target.value as any)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg py-2.5 px-3 text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                    >
+                      <option value="has_ielts">{isAr ? 'لدي شهادة آيلتس (IELTS) أو توفل / PTE جاهزة' : 'I have IELTS / TOEFL / PTE Ready'}</option>
+                      <option value="studying">{isAr ? 'أستعد للاختبار حالياً وأريد تقييماً مبدئياً' : 'Preparing for English Test'}</option>
+                      <option value="need_course">{isAr ? 'أرغب ببدء كورس لغة بالخارج قبل الجامعة' : 'Want to study English abroad first'}</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-3 rounded-xl font-black text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors flex items-center justify-center gap-2 shadow-md cursor-pointer mt-2"
+                  >
+                    <Sparkles className="w-4 h-4 text-slate-950" />
+                    <span>{isAr ? 'احسب فرص القبول والخيارات المتاحة' : 'Check My University Matches'}</span>
+                  </button>
+                </form>
+              ) : (
+                /* Calculation Result View */
+                <div className="space-y-4 text-start animate-fadeIn">
+                  <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs">
+                    <div className="font-bold text-sm text-white mb-1 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <span>{isAr ? 'فرص قبولك ممتازة بنسبة 96%!' : 'Admission Match Rate: 96%!'}</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-emerald-200/90">
+                      {isAr 
+                        ? `بناءً على معطياتك، أنت مؤهل للتقديم المباشر على 14 جامعة مرموقة في ${selectedCountry === 'uk' ? 'بريطانيا' : selectedCountry === 'australia' ? 'أستراليا' : 'نيوزيلندا'} مع إمكانية الحصول على منحة تفوق دراسي جزئية.`
+                        : `Based on your profile, you qualify for direct placement in over 14 partner institutions with potential international merit discounts.`}
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700 text-xs space-y-2">
+                    <div className="text-slate-300 font-bold text-[11px] border-b border-slate-700 pb-1">
+                      {isAr ? 'الجامعات المقترحة لملفك الأكاديمي:' : 'Top Matched Universities:'}
+                    </div>
+                    <div className="flex items-center justify-between text-slate-200">
+                      <span className="font-semibold">
+                        {selectedCountry === 'uk' ? 'جامعة مانشستر / ليدز' : selectedCountry === 'australia' ? 'جامعة ملبورن / سيدني' : 'جامعة أوكلاند'}
+                      </span>
+                      <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                        {isAr ? 'معتمدة بالخليج' : 'Accredited'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-200">
+                      <span className="font-semibold">
+                        {selectedCountry === 'uk' ? 'جامعة برمنجهام / بريستول' : selectedCountry === 'australia' ? 'جامعة موناش / كوينزلاند' : 'جامعة أوتاجو'}
+                      </span>
+                      <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                        {isAr ? 'منح متوفرة' : 'Scholarships'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2 pt-1">
+                    <button
+                      onClick={() => onOpenApplication(selectedCountry)}
+                      className="w-full py-3 rounded-xl font-black text-xs bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 text-slate-950 flex items-center justify-center gap-2 shadow-md"
+                    >
+                      <GraduationCap className="w-4 h-4" />
+                      <span>{isAr ? 'ثبت طلبك واستلم القبول المبدئي' : 'Lock in Your Application'}</span>
+                    </button>
+                    <button
+                      onClick={() => setCalculatedResult(false)}
+                      className="w-full py-2 rounded-lg text-slate-400 hover:text-white text-[11px] text-center"
+                    >
+                      {isAr ? 'إعادة الحساب بتخصص أو دولة أخرى' : 'Recalculate with different criteria'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  );
+};

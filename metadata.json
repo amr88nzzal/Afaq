@@ -1,0 +1,6 @@
+{
+  "name": "آفاق العالمية | Afaq Global Education",
+  "description": "منصة آفاق العالمية لتأمين القبولات الجامعية والدراسة بالخارج في بريطانيا وأستراليا ونيوزيلندا مع لوحة تحكم متطورة وتتبع الطلبات والتواصل المباشر مع المستشارين.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

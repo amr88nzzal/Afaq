@@ -1,18 +1,18 @@
 # ============================================================================
 # حاوية بناء وتشغيل الواجهة الأمامية (Afaq Frontend Dockerfile)
 # ============================================================================
-# المرحلة 1: بناء ملفات React بواسطة Node.js
-FROM node:20-alpine AS builder
+# المرحلة 1: بناء ملفات React بواسطة Node.js (استخدام node:20-slim لتفادي مشاكل musl على معالجات ARM64)
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
-# نسخ ملفات الحزم لتسريع الـ Caching
+# نسخ ملفات الحزم وتثبيتها
 COPY package*.json ./
 RUN npm install
 
-# نسخ كود المصدر وبناء الحزم
+# نسخ ملفات المشروع وبناء واجهة المستخدم
 COPY . .
-RUN npm run build
+RUN npx vite build
 
 # المرحلة 2: خادم Nginx عالي الأداء والسرعة
 FROM nginx:alpine AS runner

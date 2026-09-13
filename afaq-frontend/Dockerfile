@@ -8,7 +8,7 @@ WORKDIR /app
 
 # نسخ ملفات الحزم لتسريع الـ Caching
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 # نسخ كود المصدر وبناء الحزم
 COPY . .

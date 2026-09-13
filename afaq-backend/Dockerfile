@@ -8,9 +8,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=5000
 
-# تثبيت متطلبات التشغيل
+# تثبيت متطلبات التشغيل (استخدام npm install لضمان التثبيت سواء وجد package-lock أم لا)
 COPY package*.json ./
-RUN npm ci --omit=dev && npm install -g tsx
+RUN npm install && npm install -g tsx
 
 # نسخ ملفات الخادم وقواعد البيانات والخدمات
 COPY server.ts ./

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { DestinationCountry, Language, StudyLevel, University, Theme } from '../types';
+import { submitApplicationAPI } from '../services/api';
 import { 
   X, 
   GraduationCap, 
@@ -15,7 +16,8 @@ import {
   ShieldCheck,
   Send,
   Building2,
-  Check
+  Check,
+  Loader2
 } from 'lucide-react';
 
 interface ApplicationModalProps {
@@ -68,10 +70,29 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const appNum = `AFQ-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    setIsSubmitting(true);
+
+    const payload = {
+      studentName: fullName,
+      phone,
+      whatsapp: optInWhatsapp ? phone : undefined,
+      email,
+      countryDestination: destination,
+      preferredUniversity: preferredUniversity || (destination === 'uk' ? 'University of Manchester' : destination === 'australia' ? 'University of Sydney' : 'University of Auckland'),
+      studyLevel,
+      preferredMajor: majorInterest,
+      sponsorType: hasSponsorship === 'yes' ? 'مبتعث حكومي' : hasSponsorship === 'applying' ? 'متقدم لبرنامج ابتعاث' : 'نفقة خاصة',
+      additionalNotes: `خدمات إضافية مختارة: ${selectedOptionalServices.join(', ') || 'لا يوجد'}. تلغرام: ${optInTelegram ? (telegramUsername || 'موافق') : 'غير محدد'}`,
+    };
+
+    const res = await submitApplicationAPI(payload);
+    const appNum = res.applicationNumber;
     setGeneratedAppNum(appNum);
+    setIsSubmitting(false);
     setStep(3);
 
     const appData = {
@@ -424,10 +445,20 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
               </button>
               <button
                 type="submit"
-                className="flex-1 py-3 rounded-xl font-black text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center gap-2 shadow cursor-pointer transition-transform active:scale-98"
+                disabled={isSubmitting}
+                className="flex-1 py-3 rounded-xl font-black text-xs bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 flex items-center justify-center gap-2 shadow cursor-pointer transition-transform active:scale-98"
               >
-                <Sparkles className="w-4 h-4" />
-                <span>{isAr ? 'إرسال طلب القبول المجاني 100%' : 'Submit 100% Free Placement'}</span>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>{isAr ? 'جاري المعالجة والإرسال للإدارة...' : 'Processing & Dispatching...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    <span>{isAr ? 'إرسال طلب القبول المجاني 100%' : 'Submit 100% Free Placement'}</span>
+                  </>
+                )}
               </button>
             </div>
           </form>

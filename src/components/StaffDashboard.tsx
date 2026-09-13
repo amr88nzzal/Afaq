@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MOCK_APPLICATIONS, INITIAL_ADMIN_ALERTS } from '../data/mockData';
 import { Application, ApplicationStage, Language, Theme, AdminAlert } from '../types';
+import { fetchApplicationsAPI, updateApplicationStatusAPI, checkServerHealthAPI } from '../services/api';
+import { SettingsManager } from './SettingsManager';
 import { 
   Users, 
   Search, 
@@ -27,7 +29,14 @@ import {
   Check,
   Globe,
   Sun,
-  Moon
+  Moon,
+  Database,
+  Server,
+  Layers,
+  Cpu,
+  HardDrive,
+  Copy,
+  Terminal
 } from 'lucide-react';
 import { LogoRenderer } from './LogoRenderer';
 
@@ -60,6 +69,10 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   const [adminPin, setAdminPin] = useState<string>('');
   const [pinError, setPinError] = useState<boolean>(false);
 
+  // Admin Tab Navigation: 'crm' | 'settings' | 'docker'
+  const [mainTab, setMainTab] = useState<'crm' | 'settings' | 'docker'>('crm');
+  const [isPostgresOnline, setIsPostgresOnline] = useState<boolean>(false);
+
   // Applications & Alerts state
   const [applications, setApplications] = useState<Application[]>(MOCK_APPLICATIONS);
   const [alerts, setAlerts] = useState<AdminAlert[]>([
@@ -70,6 +83,20 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedApp, setSelectedApp] = useState<Application | null>(applications[0]);
   const [alertSuccessToast, setAlertSuccessToast] = useState<string | null>(null);
+
+  // جلب الطلبات الحية وفحص صحة البوستجريس
+  useEffect(() => {
+    async function initData() {
+      const serverApps = await fetchApplicationsAPI();
+      if (serverApps && serverApps.length > 0) {
+        setApplications(serverApps);
+        if (!selectedApp) setSelectedApp(serverApps[0]);
+      }
+      const health = await checkServerHealthAPI();
+      setIsPostgresOnline(health.postgres);
+    }
+    initData();
+  }, []);
 
   // Quick Dispatch modal/message
   const [customMsg, setCustomMsg] = useState<string>('');
@@ -294,6 +321,49 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
           </div>
         </div>
 
+        {/* Admin Main Navigation Tabs */}
+        <div className="flex items-center gap-2 flex-wrap border-b border-slate-800/40 pb-3">
+          <button
+            onClick={() => setMainTab('crm')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+              mainTab === 'crm' 
+                ? 'bg-amber-500 text-slate-950 shadow-md font-black' 
+                : isDark ? 'bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>{isAr ? 'إدارة الطلبات والطلاب (CRM)' : 'Applications & CRM'}</span>
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-950/20 font-mono">
+              {applications.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setMainTab('settings')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+              mainTab === 'settings' 
+                ? 'bg-amber-500 text-slate-950 shadow-md font-black' 
+                : isDark ? 'bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            <Database className="w-4 h-4" />
+            <span>{isAr ? 'إعدادات ومعطيات المنصة (PostgreSQL)' : 'PostgreSQL Dynamic Settings'}</span>
+            <span className={`w-2 h-2 rounded-full ${isPostgresOnline ? 'bg-emerald-400 animate-pulse' : 'bg-blue-400'}`} />
+          </button>
+
+          <button
+            onClick={() => setMainTab('docker')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+              mainTab === 'docker' 
+                ? 'bg-amber-500 text-slate-950 shadow-md font-black' 
+                : isDark ? 'bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            <span>{isAr ? 'بنية السيرفر والدوكر (Oracle ARM 4CPU/24GB)' : 'Docker & Cloud Deployment'}</span>
+          </button>
+        </div>
+
         {/* Real-time Incoming New Applications Alert Ticker (Requirement 2) */}
         <div className={`rounded-2xl border p-4 sm:p-5 transition-all ${
           unreadAlertsCount > 0 
@@ -396,43 +466,46 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
           </div>
         )}
 
-        {/* KPI Quick Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className={`border rounded-2xl p-5 text-start space-y-1 ${
-            isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
-          }`}>
-            <div className="text-slate-400 text-xs font-semibold">{isAr ? 'إجمالي الملفات الأكاديمية' : 'Total Active Files'}</div>
-            <div className="text-2xl font-black">142</div>
-            <div className="text-[11px] text-emerald-500 font-medium">↑ +18% هذا الشهر</div>
-          </div>
+        {/* Tab 1: CRM & Applications */}
+        {mainTab === 'crm' && (
+          <>
+            {/* KPI Quick Stats */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className={`border rounded-2xl p-5 text-start space-y-1 ${
+                isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+              }`}>
+                <div className="text-slate-400 text-xs font-semibold">{isAr ? 'إجمالي الملفات الأكاديمية' : 'Total Active Files'}</div>
+                <div className="text-2xl font-black">{applications.length}</div>
+                <div className="text-[11px] text-emerald-500 font-medium">↑ +18% هذا الشهر</div>
+              </div>
 
-          <div className={`border rounded-2xl p-5 text-start space-y-1 ${
-            isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
-          }`}>
-            <div className="text-slate-400 text-xs font-semibold">{isAr ? 'قبولات مشروطة مجانية' : 'Free Offers Issued'}</div>
-            <div className="text-2xl font-black text-amber-500">89</div>
-            <div className="text-[11px] text-slate-400">{isAr ? 'إصدار سريع خلال 3-5 أيام' : '3-5 Days Average'}</div>
-          </div>
+              <div className={`border rounded-2xl p-5 text-start space-y-1 ${
+                isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+              }`}>
+                <div className="text-slate-400 text-xs font-semibold">{isAr ? 'قبولات مشروطة مجانية' : 'Free Offers Issued'}</div>
+                <div className="text-2xl font-black text-amber-500">89</div>
+                <div className="text-[11px] text-slate-400">{isAr ? 'إصدار سريع خلال 3-5 أيام' : '3-5 Days Average'}</div>
+              </div>
 
-          <div className={`border rounded-2xl p-5 text-start space-y-1 ${
-            isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
-          }`}>
-            <div className="text-slate-400 text-xs font-semibold">{isAr ? 'تأشيرات سفر ممنوحة' : 'Visas Approved'}</div>
-            <div className="text-2xl font-black text-emerald-500">51</div>
-            <div className="text-[11px] text-emerald-500 font-medium">98.4% {isAr ? 'نسبة نجاح الفيزا' : 'Approval Rate'}</div>
-          </div>
+              <div className={`border rounded-2xl p-5 text-start space-y-1 ${
+                isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+              }`}>
+                <div className="text-slate-400 text-xs font-semibold">{isAr ? 'تأشيرات سفر ممنوحة' : 'Visas Approved'}</div>
+                <div className="text-2xl font-black text-emerald-500">51</div>
+                <div className="text-[11px] text-emerald-500 font-medium">98.4% {isAr ? 'نسبة نجاح الفيزا' : 'Approval Rate'}</div>
+              </div>
 
-          <div className={`border rounded-2xl p-5 text-start space-y-1 ${
-            isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
-          }`}>
-            <div className="text-slate-400 text-xs font-semibold">{isAr ? 'تنبيهات فورية للمدراء' : 'Manager Alerts'}</div>
-            <div className="text-2xl font-black text-blue-500">{alerts.length}</div>
-            <div className="text-[11px] text-slate-400">{isAr ? 'معدل استجابة أقل من ساعتين' : '< 2h Response Time'}</div>
-          </div>
-        </div>
+              <div className={`border rounded-2xl p-5 text-start space-y-1 ${
+                isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+              }`}>
+                <div className="text-slate-400 text-xs font-semibold">{isAr ? 'تنبيهات فورية للمدراء' : 'Manager Alerts'}</div>
+                <div className="text-2xl font-black text-blue-500">{alerts.length}</div>
+                <div className="text-[11px] text-slate-400">{isAr ? 'معدل استجابة أقل من ساعتين' : '< 2h Response Time'}</div>
+              </div>
+            </div>
 
-        {/* Main Workspace: Application List (7 cols) + Detail Drawer & Official Responder (5 cols) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Main Workspace: Application List (7 cols) + Detail Drawer & Official Responder (5 cols) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* Applications Table (7 cols) */}
           <div className={`lg:col-span-7 border rounded-2xl p-5 shadow-xl space-y-4 text-start ${
@@ -732,6 +805,150 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
           </div>
 
         </div>
+          </>
+        )}
+
+        {/* Tab 2: Dynamic PostgreSQL Settings Manager */}
+        {mainTab === 'settings' && (
+          <SettingsManager lang={lang} theme={theme} />
+        )}
+
+        {/* Tab 3: Docker & Cloud Server Architecture */}
+        {mainTab === 'docker' && (
+          <div className={`border rounded-2xl p-6 shadow-xl space-y-6 text-start ${
+            isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+          }`}>
+            <div className="flex items-center gap-3 pb-4 border-b border-slate-800/40">
+              <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-500">
+                <Layers className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black">
+                  {isAr ? 'هيكلية النشر عبر 3 حاويات Docker على سيرفر أوراكل كلاود' : '3-Container Docker Architecture (Oracle Cloud)'}
+                </h2>
+                <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {isAr 
+                    ? '4CPU ARM • 24 GB RAM • Cloudflare Tunnel • afaq-global.amrodev.com' 
+                    : 'Configured for Oracle ARM Ampere A1 with Cloudflare integration'}
+                </p>
+              </div>
+            </div>
+
+            {/* Containers Overview Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Container 1: Frontend */}
+              <div className={`p-4 rounded-xl border space-y-2 ${
+                isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-amber-500 flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5" />
+                    1. Afaq-frontend
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400">Port 3000 : 80</span>
+                </div>
+                <div className="text-xs font-semibold">Nginx + React Vite (SPA)</div>
+                <p className="text-[11px] text-slate-400">
+                  {isAr 
+                    ? 'يقوم ببناء React وتوزيع الملفات الثابتة عبر Nginx عالي السرعة، مع توجيه طلبات /api/ للباك إند.' 
+                    : 'High performance Nginx serving compiled React assets with /api/ reverse proxy.'}
+                </p>
+                <div className="text-[10px] font-mono text-slate-400 bg-slate-900 p-2 rounded border border-slate-800">
+                  afaq-frontend/Dockerfile
+                </div>
+              </div>
+
+              {/* Container 2: Backend */}
+              <div className={`p-4 rounded-xl border space-y-2 ${
+                isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-blue-400 flex items-center gap-1.5">
+                    <Server className="w-3.5 h-3.5" />
+                    2. Afaq-Backend
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400">Port 5000</span>
+                </div>
+                <div className="text-xs font-semibold">Node.js + Express.js API</div>
+                <p className="text-[11px] text-slate-400">
+                  {isAr 
+                    ? 'معالجة الطلبات، إرسال إيميلات Gmail SMTP الفورية، وإرسال تنبيهات Telegram Bot للمدراء.' 
+                    : 'RESTful API with Nodemailer (Gmail SMTP) and Telegram Bot manager alerts.'}
+                </p>
+                <div className="text-[10px] font-mono text-slate-400 bg-slate-900 p-2 rounded border border-slate-800">
+                  afaq-backend/Dockerfile
+                </div>
+              </div>
+
+              {/* Container 3: Database */}
+              <div className={`p-4 rounded-xl border space-y-2 ${
+                isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-emerald-400 flex items-center gap-1.5">
+                    <Database className="w-3.5 h-3.5" />
+                    3. Afaq-DB
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400">Port 5432</span>
+                </div>
+                <div className="text-xs font-semibold">PostgreSQL 16 Alpine</div>
+                <p className="text-[11px] text-slate-400">
+                  {isAr 
+                    ? 'قاعدة بيانات مستدامة تخزن كافة الإعدادات والطلبات، مع وحدة تخزين دائمة afaq_pgdata.' 
+                    : 'PostgreSQL 16 with init.sql schema auto-execution and persistent Docker volume.'}
+                </p>
+                <div className="text-[10px] font-mono text-slate-400 bg-slate-900 p-2 rounded border border-slate-800">
+                  afaq-db/init.sql
+                </div>
+              </div>
+            </div>
+
+            {/* Git Repository Strategy Recommendation */}
+            <div className={`p-4 rounded-xl border space-y-2 ${
+              isDark ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <div className="font-bold text-xs text-amber-400 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>{isAr ? 'الإجابة والتوصية حول مستودع GitHub (مستودع واحد Monorepo أم ثلاثة مستودعات؟)' : 'GitHub Repository Architecture (Monorepo vs Multi-repo)'}</span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                {isAr 
+                  ? '✅ التوصية القياسية المعتمدة عالمياً لمثل هذا المشروع المشغّل عبر Docker Compose هي: مستودع واحد (Monorepo) على حسابك على GitHub.' 
+                  : 'Industry Best Practice: A single repository (Monorepo) is strongly recommended for Docker Compose applications.'}
+              </p>
+              <ul className="text-xs text-slate-400 space-y-1 list-disc list-inside">
+                <li>{isAr ? 'سهولة الاستنساخ على سيرفر أوراكل بأمر واحد: git clone ثم تشغيل docker compose up' : 'Single git clone command on your Oracle VM followed by docker compose up'}</li>
+                <li>{isAr ? 'مزامنة كاملة لأنواع البيانات (TypeScript Types) بين الواجهة الأمامية والباك إند' : 'Shared TypeScript interfaces and data models without version mismatch'}</li>
+                <li>{isAr ? 'ملف docker-compose.yml واحد في الجذر يربط الحاويات الثلاث داخل شبكة داخلية آمنة' : 'Single root docker-compose.yml orchestrating internal bridge networking'}</li>
+              </ul>
+            </div>
+
+            {/* Quick Commands to Run on Oracle Cloud */}
+            <div className="space-y-2">
+              <div className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <Terminal className="w-4 h-4 text-amber-500" />
+                <span>{isAr ? 'أوامر التشغيل المباشرة على سيرفر أوراكل كلاود (Oracle ARM Cloud):' : 'Terminal Commands for Oracle Cloud VM:'}</span>
+              </div>
+              <pre className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-emerald-400 font-mono text-xs overflow-x-auto whitespace-pre">
+{`# 1. الدخول إلى مجلد المشروع
+cd afaq-global
+
+# 2. نسخ وضبط متغيرات البيئة (كلمة مرور قاعدة البيانات، الجيميل، التلغرام)
+cp .env.example .env
+nano .env
+
+# 3. بناء وتشغيل الحاويات الثلاث في الخلفية
+docker compose up -d --build
+
+# 4. التحقق من عمل الحاويات
+docker compose ps
+
+# 5. مراقبة سجلات الخادم
+docker compose logs -f afaq_backend`}
+              </pre>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

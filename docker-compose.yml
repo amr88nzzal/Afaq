@@ -1,39 +1,88 @@
 version: '3.8'
 
-services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: afaq_global_app
-    restart: always
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - DATABASE_URL=postgres://afaq_user:ChangeMeSecurePassword123@db:5432/afaq_db
-    depends_on:
-      - db
-    networks:
-      - afaq_network
+# ============================================================================
+# بنية تشغيل منصة آفاق التعليمية عبر Docker Compose (3 Containers Architecture)
+# ============================================================================
+# الدومين المعتمد: afaq-global.amrodev.com
+# 1. حاوية قاعدة البيانات (afaq_postgres)
+# 2. حاوية خادم الباك إند والـ API (afaq_backend)
+# 3. حاوية الواجهة الأمامية وخادم Nginx (afaq_frontend)
+# ============================================================================
 
-  db:
+services:
+  # --------------------------------------------------------------------------
+  # 1. حاوية قاعدة بيانات PostgreSQL (Afaq Database)
+  # --------------------------------------------------------------------------
+  afaq_db:
     image: postgres:16-alpine
     container_name: afaq_postgres
     restart: always
     environment:
-      POSTGRES_USER: afaq_user
-      POSTGRES_PASSWORD: ChangeMeSecurePassword123
-      POSTGRES_DB: afaq_db
+      POSTGRES_USER: ${POSTGRES_USER:-afaq_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ChangeMeSecurePassword123}
+      POSTGRES_DB: ${POSTGRES_DB:-afaq_db}
     volumes:
       - afaq_pgdata:/var/lib/postgresql/data
+      - ./afaq-db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
-      - afaq_network
+      - afaq_internal_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U afaq_user -d afaq_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # --------------------------------------------------------------------------
+  # 2. حاوية خادم الباك إند والـ API (Afaq Node.js + Express Backend)
+  # --------------------------------------------------------------------------
+  afaq_backend:
+    build:
+      context: .
+      dockerfile: ./afaq-backend/Dockerfile
+    container_name: afaq_backend
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - DATABASE_URL=postgres://${POSTGRES_USER:-afaq_user}:${POSTGRES_PASSWORD:-ChangeMeSecurePassword123}@afaq_db:5432/${POSTGRES_DB:-afaq_db}
+      - GMAIL_USER=${GMAIL_USER:-admissions@afaq-global.amrodev.com}
+      - GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD:-}
+      - ADMIN_NOTIFICATION_EMAILS=${ADMIN_NOTIFICATION_EMAILS:-admin@amrodev.com, amr.nzzal@gmail.com}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+    depends_on:
+      afaq_db:
+        condition: service_healthy
+    networks:
+      - afaq_internal_net
+    expose:
+      - "5000"
+
+  # --------------------------------------------------------------------------
+  # 3. حاوية الواجهة الأمامية و Nginx (Afaq React Frontend)
+  # --------------------------------------------------------------------------
+  afaq_frontend:
+    build:
+      context: .
+      dockerfile: ./afaq-frontend/Dockerfile
+    container_name: afaq_frontend
+    restart: always
+    ports:
+      # المنفذ الخارجي لربطه مع Cloudflare Tunnel أو Nginx Reverse Proxy
+      - "3000:80"
+    depends_on:
+      - afaq_backend
+    networks:
+      - afaq_internal_net
+
+# ----------------------------------------------------------------------------
+# الشبكات ووحدات التخزين المستدامة (Networks & Persistent Volumes)
+# ----------------------------------------------------------------------------
 volumes:
   afaq_pgdata:
+    name: afaq_postgres_data
 
 networks:
-  afaq_network:
+  afaq_internal_net:
+    name: afaq_internal_network
     driver: bridge

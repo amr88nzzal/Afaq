@@ -1,20 +1,22 @@
 # ============================================================================
 # حاوية بناء وتشغيل الواجهة الأمامية (Afaq Frontend Dockerfile)
 # ============================================================================
-# المرحلة 1: بناء ملفات React بواسطة Node.js (استخدام node:20-slim لتفادي مشاكل musl على معالجات ARM64)
-FROM node:20-slim AS builder
+# المرحلة 1: بناء ملفات React بواسطة Node.js (Debian Bookworm-slim)
+FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
 
-# نسخ ملفات الحزم وتثبيتها
+# نسخ ملفات الحزم
 COPY package*.json ./
-RUN npm install
 
-# نسخ ملفات المشروع وبناء واجهة المستخدم
+# تثبيت الحزم مع فرض تثبيت حزم التوافق لمعالجات ARM64 (Rollup binary)
+RUN npm install && npm install --save-optional @rollup/rollup-linux-arm64-gnu
+
+# نسخ ملفات المشروع وبناء واجهة المستخدم عبر Vite
 COPY . .
 RUN npx vite build
 
-# المرحلة 2: خادم Nginx عالي الأداء والسرعة
+# المرحلة 2: خادم Nginx عالي الأداء والسرعة لخدمة الملفات
 FROM nginx:alpine AS runner
 
 # نسخ ملفات React المبنية إلى مسار Nginx

@@ -67,9 +67,26 @@ export async function testDbConnection(): Promise<boolean> {
   try {
     const client = await pool.connect();
     const res = await client.query('SELECT NOW()');
-    client.release();
     isPostgresConnected = true;
     console.log('✅ [Database] تم الاتصال بقاعدة بيانات PostgreSQL بنجاح في:', res.rows[0].now);
+
+    // التحقق التلقائي من بنية الجداول وترقية الأعمدة (Auto-Migration)
+    try {
+      await client.query(`
+        ALTER TABLE applications ADD COLUMN IF NOT EXISTS notes TEXT;
+        ALTER TABLE applications ADD COLUMN IF NOT EXISTS portal_password VARCHAR(100) DEFAULT '123456';
+        ALTER TABLE applications ADD COLUMN IF NOT EXISTS counselor_name VARCHAR(100) DEFAULT 'د. فيصل الشمري';
+        ALTER TABLE applications ADD COLUMN IF NOT EXISTS counselor_phone VARCHAR(50) DEFAULT '+966 50 123 4567';
+        ALTER TABLE applications ADD COLUMN IF NOT EXISTS stage_index INT DEFAULT 1;
+        ALTER TABLE applications ADD COLUMN IF NOT EXISTS timeline_json JSONB;
+        ALTER TABLE applications ADD COLUMN IF NOT EXISTS documents_json JSONB;
+      `);
+      console.log('🛡️ [Database Schema] تم التأكد من توافق وتحديث كافة أعمدة جدول applications');
+    } catch (schemaErr: any) {
+      console.warn('⚠️ [Database Schema] تحذير فحص أعمدة الجدول:', schemaErr.message);
+    }
+
+    client.release();
     return true;
   } catch (error: any) {
     isPostgresConnected = false;

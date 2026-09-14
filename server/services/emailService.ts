@@ -169,3 +169,98 @@ export async function sendNewApplicationEmailToAdmin(data: ApplicationEmailPaylo
     return { success: false, message: error.message };
   }
 }
+
+/**
+ * إرسال بريد ترحيبي رسمي للطالب يحتوي على بيانات الدخول لبوابة متابعة طلبه
+ */
+export async function sendStudentCredentialsEmail(data: {
+  studentName: string;
+  studentEmail: string;
+  applicationNumber: string;
+  portalPassword: string;
+  destination: string;
+  universityName?: string;
+  counselorName?: string;
+}): Promise<{ success: boolean; message: string }> {
+  const portalUrl = 'https://afaq-global.amrodev.com/#student-portal';
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; color: #1e293b; }
+        .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0; }
+        .header { background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); color: #ffffff; padding: 28px; text-align: center; }
+        .badge { display: inline-block; background-color: #10b981; color: #ffffff; font-weight: bold; font-size: 12px; padding: 4px 14px; border-radius: 9999px; margin-bottom: 10px; }
+        .content { padding: 28px; line-height: 1.7; }
+        .cred-card { background: #f1f5f9; border: 2px dashed #cbd5e1; border-radius: 14px; padding: 20px; margin: 20px 0; text-align: center; }
+        .cred-label { font-size: 12px; color: #64748b; font-weight: bold; margin-bottom: 4px; }
+        .cred-val { font-family: monospace; font-size: 22px; font-weight: 900; color: #0f172a; letter-spacing: 2px; }
+        .footer { background: #f8fafc; padding: 16px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; }
+        .btn { display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #0f172a; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-weight: 900; font-size: 15px; margin-top: 14px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="badge">القبول الجامعي مجاني 100% ✨</div>
+          <h2 style="margin: 0; font-size: 22px;">أهلاً بك في آفاق العالمية للخدمات التعليمية</h2>
+          <p style="margin: 6px 0 0 0; font-size: 14px; opacity: 0.9;">بوابتك المعتمدة للجامعات العريقة</p>
+        </div>
+        <div class="content">
+          <p style="font-size: 16px;">مرحباً <strong>${data.studentName}</strong>،</p>
+          <p>يسرنا إبلاغك بأنه تم تسجيل واستلام طلب قبولك الأكاديمي بنجاح، وتعيين مستشار أكاديمي مختص لمتابعة ملفك لدى عمادات القبول بالجامعات الشريكة.</p>
+          
+          <div class="cred-card">
+            <div style="margin-bottom: 14px;">
+              <div class="cred-label">رقم الطلب الخاص بك (Application Number):</div>
+              <div class="cred-val" style="color: #d97706;">${data.applicationNumber}</div>
+            </div>
+            <div>
+              <div class="cred-label">كلمة المرور الافتراضية لبوابة الطالب (Portal Password):</div>
+              <div class="cred-val" style="color: #2563eb;">${data.portalPassword}</div>
+            </div>
+          </div>
+
+          <p style="font-size: 13px; color: #64748b;">
+            💡 يمكنك استخدام هذه البيانات للدخول إلى صفحة متابعة طلبك في أي وقت، ومتابعة المراحل السبعة لصدور القبول والفيزا، ورفع مستنداتك واستلام عروض الجامعات.
+          </p>
+
+          <div style="text-align: center; margin-top: 24px;">
+            <a href="${portalUrl}" class="btn">الدخول إلى بوابة متابعة طلبي الآن</a>
+          </div>
+        </div>
+        <div class="footer">
+          إذا كانت لديك أي استفسارات، يمكنك التواصل مع مستشارك المباشر عبر الواتساب أو الرد على هذا البريد الإلكتروني.<br>
+          © 2026 آفاق العالمية للخدمات التعليمية والقبولات الجامعية
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  if (!transporter) {
+    console.log(`📨 [Email Simulated] إرسال بيانات دخول الطالب إلى [${data.studentEmail}]: طلب ${data.applicationNumber} - كلمة المرور: ${data.portalPassword}`);
+    return {
+      success: true,
+      message: 'تم إرسال بيانات الدخول (وضع المحاكاة)',
+    };
+  }
+
+  try {
+    const info = await transporter.sendMail({
+      from: `"Afaq Global Admissions" <${GMAIL_USER}>`,
+      to: data.studentEmail,
+      subject: `🎓 بيانات دخول بوابة متابعة طلبك [${data.applicationNumber}] - آفاق العالمية`,
+      html: htmlContent,
+    });
+    console.log(`✅ [Student Email Sent] تم إرسال بيانات الدخول للطالب (${data.studentEmail}): ${info.messageId}`);
+    return { success: true, message: `Credentials email sent: ${info.messageId}` };
+  } catch (error: any) {
+    console.error('❌ [Student Email Error] فشل إرسال بريد بيانات الدخول للطالب:', error.message);
+    return { success: false, message: error.message };
+  }
+}
+

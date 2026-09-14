@@ -27,7 +27,18 @@ router.get('/', async (req: Request, res: Response) => {
       }
       sql += ' ORDER BY world_rank ASC';
       const result = await pool.query(sql, params);
-      return res.json({ success: true, source: 'postgres', data: result.rows });
+      const sanitizedRows = result.rows.map(row => {
+        let img = row.image;
+        if (img && img.startsWith('/src/assets/images/')) {
+          const fileName = img.split('/').pop();
+          img = `/images/${fileName}`;
+        }
+        if (!img || img.includes('placeholder')) {
+          img = row.country === 'uk' ? '/images/uk.jpg' : row.country === 'australia' ? '/images/australia.jpg' : '/images/new_zealand.jpg';
+        }
+        return { ...row, image: img };
+      });
+      return res.json({ success: true, source: 'postgres', data: sanitizedRows });
     }
 
     // الرد من الذاكرة

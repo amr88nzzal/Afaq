@@ -4,9 +4,11 @@ import { Language } from '../types';
 
 export interface NotificationPayload {
   id: string;
-  channel: 'whatsapp' | 'telegram' | 'email';
+  channel?: 'whatsapp' | 'telegram' | 'email';
+  type?: 'whatsapp' | 'telegram' | 'email';
   title: string;
-  body: string;
+  body?: string;
+  message?: string;
   timestamp: string;
 }
 
@@ -24,7 +26,9 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
   if (!notification) return null;
   const isAr = lang === 'ar';
 
-  const channelConfig = {
+  const channelKey = (notification.channel || notification.type || 'whatsapp') as 'whatsapp' | 'telegram' | 'email';
+
+  const channelConfigMap = {
     whatsapp: {
       bgColor: 'bg-emerald-950/95 border-emerald-500/50',
       badgeBg: 'bg-emerald-500 text-slate-950',
@@ -43,7 +47,10 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
       icon: '✉️',
       channelName: isAr ? 'البريد الإلكتروني الرسمي' : 'Official Email',
     }
-  }[notification.channel];
+  };
+
+  const channelConfig = channelConfigMap[channelKey] || channelConfigMap.whatsapp;
+  const contentText = notification.body || notification.message || '';
 
   return (
     <div className="fixed bottom-6 right-6 z-50 max-w-md w-full animate-slideUp">
@@ -68,9 +75,11 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
                 {notification.title}
               </div>
 
-              <p className="text-xs text-slate-200 leading-relaxed">
-                {notification.body}
-              </p>
+              {contentText && (
+                <p className="text-xs text-slate-200 leading-relaxed">
+                  {contentText}
+                </p>
+              )}
             </div>
           </div>
 

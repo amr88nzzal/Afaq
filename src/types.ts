@@ -97,6 +97,7 @@ export interface Application {
   documents: DocumentItem[];
   timeline: TimelineEvent[];
   notes: string[];
+  portalPassword?: string;
 }
 
 export interface Counselor {

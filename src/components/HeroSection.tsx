@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Language, DestinationCountry, StudyLevel } from '../types';
+import { Language, DestinationCountry, StudyLevel, Theme } from '../types';
 import { 
   GraduationCap, 
   CheckCircle2, 
@@ -9,15 +9,12 @@ import {
   Shield, 
   Clock, 
   Award,
-  ChevronRight,
-  Plane,
-  Building2,
   FileCheck
 } from 'lucide-react';
 
 interface HeroSectionProps {
   lang: Language;
-  theme?: 'light' | 'dark';
+  theme?: Theme;
   onOpenApplication: (prefillCountry?: DestinationCountry) => void;
   onNavigateDestinations: (country?: DestinationCountry) => void;
   onOpenCounselorBooking: () => void;
@@ -47,17 +44,34 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   };
 
   return (
-    <section className="relative overflow-hidden bg-slate-950 text-white pt-10 pb-20 lg:pt-16 lg:pb-28">
-      {/* Background imagery with sophisticated dark overlay */}
-      <div className="absolute inset-0 z-0">
+    <section 
+      id="hero-section"
+      className={`relative overflow-hidden transition-colors duration-300 pt-10 pb-20 lg:pt-16 lg:pb-28 ${
+        isDark ? 'bg-slate-950 text-white' : 'bg-gradient-to-b from-white via-amber-50/30 to-slate-50 text-slate-900'
+      }`}
+    >
+      {/* Background imagery with theme-adaptive overlay */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
         <img 
-          src="/src/assets/images/uk_university_campus_1789309583030.jpg" 
+          src="/images/uk.jpg" 
           alt="Prestigious University Campus" 
-          className="w-full h-full object-cover object-center opacity-25 scale-105 transform filter saturate-125"
+          className={`w-full h-full object-cover object-center scale-105 transform filter transition-opacity duration-300 ${
+            isDark ? 'opacity-20 saturate-125' : 'opacity-10 saturate-100'
+          }`}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/85 to-slate-950/60" />
-        <div className="absolute -top-40 right-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-10 left-10 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+        <div 
+          className={`absolute inset-0 transition-colors duration-300 ${
+            isDark 
+              ? 'bg-gradient-to-t from-slate-950 via-slate-950/85 to-slate-950/60' 
+              : 'bg-gradient-to-t from-white via-white/95 to-white/80'
+          }`} 
+        />
+        <div className={`absolute -top-40 right-1/4 w-96 h-96 rounded-full blur-3xl pointer-events-none ${
+          isDark ? 'bg-amber-500/10' : 'bg-amber-500/15'
+        }`} />
+        <div className={`absolute bottom-10 left-10 w-96 h-96 rounded-full blur-3xl pointer-events-none ${
+          isDark ? 'bg-blue-600/10' : 'bg-blue-500/10'
+        }`} />
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -67,16 +81,24 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           <div className="lg:col-span-7 space-y-6 text-start">
             {/* Prestige & 100% Free badge */}
             <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-800/90 border border-amber-500/30 text-amber-300 text-xs font-semibold backdrop-blur-md">
-                <Sparkles className="w-4 h-4 text-amber-400" />
+              <div className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold backdrop-blur-md border ${
+                isDark 
+                  ? 'bg-slate-900/90 border-amber-500/30 text-amber-300' 
+                  : 'bg-white border-amber-500/40 text-amber-900 shadow-sm'
+              }`}>
+                <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
                 <span>
                   {isAr 
                     ? 'الوكيل المعتمد لجامعات بريطانيا (Russell Group) وأستراليا (Go8)' 
                     : 'Official Representative for UK Russell Group & Australian Go8'}
                 </span>
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-black backdrop-blur-md">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black backdrop-blur-md border ${
+                isDark 
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' 
+                  : 'bg-emerald-50 border-emerald-300 text-emerald-800 shadow-sm'
+              }`}>
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>
                   {isAr ? 'القبول الجامعي مجاني 100% وبدون أتعاب' : '100% Free University Placement'}
                 </span>
@@ -84,18 +106,26 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             </div>
 
             {/* Headline */}
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white leading-tight tracking-tight">
+            <h1 className={`text-3xl sm:text-4xl lg:text-5xl font-black leading-tight tracking-tight ${
+              isDark ? 'text-white' : 'text-slate-900'
+            }`}>
               {isAr ? (
                 <>
                   بوابتك الموثوقة لأعرق <br />
-                  <span className="bg-gradient-to-r from-amber-300 via-amber-400 to-amber-200 bg-clip-text text-transparent">
+                  <span className={isDark 
+                    ? "bg-gradient-to-r from-amber-300 via-amber-400 to-amber-200 bg-clip-text text-transparent"
+                    : "bg-gradient-to-r from-amber-600 via-amber-700 to-amber-600 bg-clip-text text-transparent"
+                  }>
                     الجامعات العالمية والابتعاث
                   </span>
                 </>
               ) : (
                 <>
                   Your Fast-Track Gateway to <br />
-                  <span className="bg-gradient-to-r from-amber-300 via-amber-400 to-amber-200 bg-clip-text text-transparent">
+                  <span className={isDark 
+                    ? "bg-gradient-to-r from-amber-300 via-amber-400 to-amber-200 bg-clip-text text-transparent"
+                    : "bg-gradient-to-r from-amber-600 via-amber-700 to-amber-600 bg-clip-text text-transparent"
+                  }>
                     Premier Global Universities
                   </span>
                 </>
@@ -103,7 +133,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             </h1>
 
             {/* Subtext */}
-            <p className="text-base sm:text-lg text-slate-300 max-w-2xl leading-relaxed">
+            <p className={`text-base sm:text-lg max-w-2xl leading-relaxed ${
+              isDark ? 'text-slate-300' : 'text-slate-700'
+            }`}>
               {isAr ? (
                 'نرافق طلاب الشرق الأوسط والخليج العربي خطوة بخطوة: تأمين القبولات غير المشروطة، معادلة الشهادات، استشارات المنح والابتعاث الحكومي، ومرافقة شاملة لإصدار التأشيرة الدراسية حتى وصولك لمقعدك الجامعي.'
               ) : (
@@ -113,27 +145,39 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
             {/* Key Value Points */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-              <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
-                <Shield className="w-5 h-5 text-emerald-400 shrink-0" />
+              <div className={`flex items-center gap-2.5 p-3 rounded-xl border transition-colors ${
+                isDark 
+                  ? 'bg-slate-900/80 border-slate-800 text-white' 
+                  : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+              }`}>
+                <Shield className="w-5 h-5 text-emerald-500 shrink-0" />
                 <div className="text-xs">
-                  <div className="font-bold text-white">{isAr ? 'قبولات رسمية 100%' : '100% Official Offers'}</div>
-                  <div className="text-slate-400 text-[11px]">{isAr ? 'عقود تمثيل جامعية مباشرة' : 'Direct university contracts'}</div>
+                  <div className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{isAr ? 'قبولات رسمية 100%' : '100% Official Offers'}</div>
+                  <div className={`${isDark ? 'text-slate-400' : 'text-slate-500'} text-[11px]`}>{isAr ? 'عقود تمثيل جامعية مباشرة' : 'Direct university contracts'}</div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
-                <Award className="w-5 h-5 text-amber-400 shrink-0" />
+              <div className={`flex items-center gap-2.5 p-3 rounded-xl border transition-colors ${
+                isDark 
+                  ? 'bg-slate-900/80 border-slate-800 text-white' 
+                  : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+              }`}>
+                <Award className="w-5 h-5 text-amber-500 shrink-0" />
                 <div className="text-xs">
-                  <div className="font-bold text-white">{isAr ? 'معتمد في دول الخليج' : 'GCC Accredited'}</div>
-                  <div className="text-slate-400 text-[11px]">{isAr ? 'متوافق مع شروط وزارات التعليم' : 'Ministry scholarship compliant'}</div>
+                  <div className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{isAr ? 'معتمد في دول الخليج' : 'GCC Accredited'}</div>
+                  <div className={`${isDark ? 'text-slate-400' : 'text-slate-500'} text-[11px]`}>{isAr ? 'متوافق مع شروط وزارات التعليم' : 'Ministry scholarship compliant'}</div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
-                <Clock className="w-5 h-5 text-blue-400 shrink-0" />
+              <div className={`flex items-center gap-2.5 p-3 rounded-xl border transition-colors ${
+                isDark 
+                  ? 'bg-slate-900/80 border-slate-800 text-white' 
+                  : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+              }`}>
+                <Clock className="w-5 h-5 text-blue-500 shrink-0" />
                 <div className="text-xs">
-                  <div className="font-bold text-white">{isAr ? 'إصدار سريع خلال 48-72 ساعة' : 'Fast 48-72h Turnaround'}</div>
-                  <div className="text-slate-400 text-[11px]">{isAr ? 'لبرامج اللغة والسنة التحضيرية' : 'For English & Foundation'}</div>
+                  <div className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{isAr ? 'إصدار سريع خلال 48-72 ساعة' : 'Fast 48-72h Turnaround'}</div>
+                  <div className={`${isDark ? 'text-slate-400' : 'text-slate-500'} text-[11px]`}>{isAr ? 'لبرامج اللغة والسنة التحضيرية' : 'For English & Foundation'}</div>
                 </div>
               </div>
             </div>
@@ -153,7 +197,11 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               <button
                 onClick={onOpenCounselorBooking}
                 id="hero-book-counselor-btn"
-                className="px-5 py-3.5 rounded-xl font-bold text-sm bg-slate-800/90 hover:bg-slate-700 text-slate-100 border border-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+                className={`px-5 py-3.5 rounded-xl font-bold text-sm border flex items-center gap-2 transition-all cursor-pointer ${
+                  isDark 
+                    ? 'bg-slate-800/90 hover:bg-slate-700 text-slate-100 border-slate-700' 
+                    : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300 shadow-sm'
+                }`}
               >
                 <span>{isAr ? 'تحدث مع مستشارك الأكاديمي' : 'Talk to an Advisor'}</span>
               </button>
@@ -161,24 +209,38 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
             {/* Destination Quick Badges */}
             <div className="pt-4 flex flex-wrap items-center gap-2 text-xs">
-              <span className="text-slate-400">{isAr ? 'استكشف الوجهات الأكثر طلباً:' : 'Explore top study destinations:'}</span>
+              <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>
+                {isAr ? 'استكشف الوجهات الأكثر طلباً:' : 'Explore top study destinations:'}
+              </span>
               <button 
                 onClick={() => onNavigateDestinations('uk')} 
-                className="px-3 py-1 rounded-md bg-slate-800/70 hover:bg-slate-700 border border-slate-700 text-slate-200 transition-colors flex items-center gap-1.5"
+                className={`px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer font-medium ${
+                  isDark 
+                    ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200' 
+                    : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800 shadow-sm'
+                }`}
               >
                 <span>🇬🇧</span>
                 <span className="font-semibold">{isAr ? 'بريطانيا' : 'United Kingdom'}</span>
               </button>
               <button 
                 onClick={() => onNavigateDestinations('australia')} 
-                className="px-3 py-1 rounded-md bg-slate-800/70 hover:bg-slate-700 border border-slate-700 text-slate-200 transition-colors flex items-center gap-1.5"
+                className={`px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer font-medium ${
+                  isDark 
+                    ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200' 
+                    : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800 shadow-sm'
+                }`}
               >
                 <span>🇦🇺</span>
                 <span className="font-semibold">{isAr ? 'أستراليا' : 'Australia'}</span>
               </button>
               <button 
                 onClick={() => onNavigateDestinations('new_zealand')} 
-                className="px-3 py-1 rounded-md bg-slate-800/70 hover:bg-slate-700 border border-slate-700 text-slate-200 transition-colors flex items-center gap-1.5"
+                className={`px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer font-medium ${
+                  isDark 
+                    ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200' 
+                    : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800 shadow-sm'
+                }`}
               >
                 <span>🇳🇿</span>
                 <span className="font-semibold">{isAr ? 'نيوزيلندا' : 'New Zealand'}</span>
@@ -188,22 +250,34 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
           {/* Quick Eligibility & Admission Matcher Widget (5 cols) */}
           <div className="lg:col-span-5">
-            <div className="bg-slate-900/90 border border-slate-700/80 rounded-2xl p-6 shadow-2xl backdrop-blur-xl relative">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-5">
+            <div className={`rounded-2xl p-6 shadow-2xl backdrop-blur-xl relative border transition-colors ${
+              isDark 
+                ? 'bg-slate-900/90 border-slate-700/80' 
+                : 'bg-white border-slate-200 shadow-xl shadow-slate-200/60'
+            }`}>
+              <div className={`flex items-center justify-between border-b pb-4 mb-5 ${
+                isDark ? 'border-slate-800' : 'border-slate-100'
+              }`}>
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                    isDark ? 'bg-amber-500/20 border border-amber-500/30 text-amber-400' : 'bg-amber-100 text-amber-700'
+                  }`}>
                     <FileCheck className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm text-white">
+                    <h3 className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>
                       {isAr ? 'حاسبة القبول والفرص الأكاديمية' : 'Quick Admission Matcher'}
                     </h3>
-                    <p className="text-[11px] text-slate-400">
+                    <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                       {isAr ? 'تقييم فوري خلال 30 ثانية' : 'Instant 30-second eligibility check'}
                     </p>
                   </div>
                 </div>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                  isDark 
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                }`}>
                   {isAr ? 'مجاني 100%' : '100% Free'}
                 </span>
               </div>
@@ -212,17 +286,21 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 <form onSubmit={handleCalculate} className="space-y-4 text-start">
                   {/* Destination Country */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    <label className={`block text-xs font-semibold mb-1.5 ${
+                      isDark ? 'text-slate-300' : 'text-slate-700'
+                    }`}>
                       {isAr ? '1. اختر الدولة التي ترغب بالدراسة فيها:' : '1. Target Study Destination:'}
                     </label>
                     <div className="grid grid-cols-3 gap-2">
                       <button
                         type="button"
                         onClick={() => setSelectedCountry('uk')}
-                        className={`p-2 rounded-lg text-xs font-bold border transition-all flex flex-col items-center gap-1 ${
+                        className={`p-2 rounded-lg text-xs font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${
                           selectedCountry === 'uk'
                             ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md'
-                            : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700'
+                            : isDark 
+                              ? 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700' 
+                              : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
                         }`}
                       >
                         <span className="text-base">🇬🇧</span>
@@ -232,10 +310,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       <button
                         type="button"
                         onClick={() => setSelectedCountry('australia')}
-                        className={`p-2 rounded-lg text-xs font-bold border transition-all flex flex-col items-center gap-1 ${
+                        className={`p-2 rounded-lg text-xs font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${
                           selectedCountry === 'australia'
                             ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md'
-                            : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700'
+                            : isDark 
+                              ? 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700' 
+                              : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
                         }`}
                       >
                         <span className="text-base">🇦🇺</span>
@@ -245,10 +325,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       <button
                         type="button"
                         onClick={() => setSelectedCountry('new_zealand')}
-                        className={`p-2 rounded-lg text-xs font-bold border transition-all flex flex-col items-center gap-1 ${
+                        className={`p-2 rounded-lg text-xs font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${
                           selectedCountry === 'new_zealand'
                             ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md'
-                            : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700'
+                            : isDark 
+                              ? 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700' 
+                              : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
                         }`}
                       >
                         <span className="text-base">🇳🇿</span>
@@ -259,13 +341,19 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
                   {/* Study Level */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    <label className={`block text-xs font-semibold mb-1.5 ${
+                      isDark ? 'text-slate-300' : 'text-slate-700'
+                    }`}>
                       {isAr ? '2. الدرجة العلمية المستهدفة:' : '2. Desired Degree Level:'}
                     </label>
                     <select
                       value={selectedLevel}
                       onChange={(e) => setSelectedLevel(e.target.value as StudyLevel)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg py-2.5 px-3 text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                      className={`w-full rounded-lg py-2.5 px-3 text-xs focus:outline-none focus:border-amber-500 border transition-colors ${
+                        isDark 
+                          ? 'bg-slate-800 border-slate-700 text-slate-100' 
+                          : 'bg-slate-50 border-slate-300 text-slate-900'
+                      }`}
                     >
                       <option value="bachelor">{isAr ? 'بكالوريوس (جامعي 3-4 سنوات)' : "Bachelor's Degree"}</option>
                       <option value="master">{isAr ? 'ماجستير (سنة مكثفة في بريطانيا أو سنتين بأستراليا)' : "Master's Degree (1-2 yrs)"}</option>
@@ -277,17 +365,21 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
                   {/* GPA / Academic Status */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    <label className={`block text-xs font-semibold mb-1.5 ${
+                      isDark ? 'text-slate-300' : 'text-slate-700'
+                    }`}>
                       {isAr ? '3. المعدل التراكمي التقريبي:' : '3. Academic Grade Level:'}
                     </label>
                     <div className="grid grid-cols-3 gap-2">
                       <button
                         type="button"
                         onClick={() => setGpaLevel('high')}
-                        className={`py-2 px-2 rounded-lg text-[11px] font-bold border transition-all ${
+                        className={`py-2 px-2 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
                           gpaLevel === 'high' 
-                            ? 'bg-blue-600 text-white border-blue-400' 
-                            : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                            ? 'bg-blue-600 text-white border-blue-500 shadow-sm' 
+                            : isDark 
+                              ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700' 
+                              : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
                         }`}
                       >
                         {isAr ? 'ممتاز (85%+ أو 3.5+)' : 'Excellent (85%+)'}
@@ -295,10 +387,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       <button
                         type="button"
                         onClick={() => setGpaLevel('medium')}
-                        className={`py-2 px-2 rounded-lg text-[11px] font-bold border transition-all ${
+                        className={`py-2 px-2 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
                           gpaLevel === 'medium' 
-                            ? 'bg-blue-600 text-white border-blue-400' 
-                            : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                            ? 'bg-blue-600 text-white border-blue-500 shadow-sm' 
+                            : isDark 
+                              ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700' 
+                              : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
                         }`}
                       >
                         {isAr ? 'جيد جداً (75-84%)' : 'Very Good (75-84%)'}
@@ -306,10 +400,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       <button
                         type="button"
                         onClick={() => setGpaLevel('need_foundation')}
-                        className={`py-2 px-2 rounded-lg text-[11px] font-bold border transition-all ${
+                        className={`py-2 px-2 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
                           gpaLevel === 'need_foundation' 
-                            ? 'bg-blue-600 text-white border-blue-400' 
-                            : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                            ? 'bg-blue-600 text-white border-blue-500 shadow-sm' 
+                            : isDark 
+                              ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700' 
+                              : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
                         }`}
                       >
                         {isAr ? 'مقبول / يحتاج تمهيدي' : 'Pathway Needed'}
@@ -319,13 +415,19 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
                   {/* English Level */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    <label className={`block text-xs font-semibold mb-1.5 ${
+                      isDark ? 'text-slate-300' : 'text-slate-700'
+                    }`}>
                       {isAr ? '4. وضع اختبار اللغة الإنجليزية:' : '4. English Proficiency Status:'}
                     </label>
                     <select
                       value={englishLevel}
                       onChange={(e) => setEnglishLevel(e.target.value as any)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg py-2.5 px-3 text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                      className={`w-full rounded-lg py-2.5 px-3 text-xs focus:outline-none focus:border-amber-500 border transition-colors ${
+                        isDark 
+                          ? 'bg-slate-800 border-slate-700 text-slate-100' 
+                          : 'bg-slate-50 border-slate-300 text-slate-900'
+                      }`}
                     >
                       <option value="has_ielts">{isAr ? 'لدي شهادة آيلتس (IELTS) أو توفل / PTE جاهزة' : 'I have IELTS / TOEFL / PTE Ready'}</option>
                       <option value="studying">{isAr ? 'أستعد للاختبار حالياً وأريد تقييماً مبدئياً' : 'Preparing for English Test'}</option>
@@ -344,35 +446,57 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               ) : (
                 /* Calculation Result View */
                 <div className="space-y-4 text-start animate-fadeIn">
-                  <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs">
-                    <div className="font-bold text-sm text-white mb-1 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <div className={`p-3.5 rounded-xl border text-xs ${
+                    isDark 
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                  }`}>
+                    <div className={`font-bold text-sm mb-1 flex items-center gap-1.5 ${
+                      isDark ? 'text-white' : 'text-emerald-950'
+                    }`}>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                       <span>{isAr ? 'فرص قبولك ممتازة بنسبة 96%!' : 'Admission Match Rate: 96%!'}</span>
                     </div>
-                    <p className="text-[11px] leading-relaxed text-emerald-200/90">
+                    <p className={`text-[11px] leading-relaxed ${
+                      isDark ? 'text-emerald-200/90' : 'text-emerald-800'
+                    }`}>
                       {isAr 
                         ? `بناءً على معطياتك، أنت مؤهل للتقديم المباشر على 14 جامعة مرموقة في ${selectedCountry === 'uk' ? 'بريطانيا' : selectedCountry === 'australia' ? 'أستراليا' : 'نيوزيلندا'} مع إمكانية الحصول على منحة تفوق دراسي جزئية.`
                         : `Based on your profile, you qualify for direct placement in over 14 partner institutions with potential international merit discounts.`}
                     </p>
                   </div>
 
-                  <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700 text-xs space-y-2">
-                    <div className="text-slate-300 font-bold text-[11px] border-b border-slate-700 pb-1">
+                  <div className={`rounded-xl p-3 border text-xs space-y-2 ${
+                    isDark 
+                      ? 'bg-slate-800/80 border-slate-700 text-slate-200' 
+                      : 'bg-slate-50 border-slate-200 text-slate-800'
+                  }`}>
+                    <div className={`font-bold text-[11px] border-b pb-1 ${
+                      isDark ? 'text-slate-300 border-slate-700' : 'text-slate-700 border-slate-200'
+                    }`}>
                       {isAr ? 'الجامعات المقترحة لملفك الأكاديمي:' : 'Top Matched Universities:'}
                     </div>
-                    <div className="flex items-center justify-between text-slate-200">
+                    <div className="flex items-center justify-between">
                       <span className="font-semibold">
                         {selectedCountry === 'uk' ? 'جامعة مانشستر / ليدز' : selectedCountry === 'australia' ? 'جامعة ملبورن / سيدني' : 'جامعة أوكلاند'}
                       </span>
-                      <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                        isDark 
+                          ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' 
+                          : 'text-amber-800 bg-amber-100 border-amber-300'
+                      }`}>
                         {isAr ? 'معتمدة بالخليج' : 'Accredited'}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between text-slate-200">
+                    <div className="flex items-center justify-between">
                       <span className="font-semibold">
                         {selectedCountry === 'uk' ? 'جامعة برمنجهام / بريستول' : selectedCountry === 'australia' ? 'جامعة موناش / كوينزلاند' : 'جامعة أوتاجو'}
                       </span>
-                      <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                        isDark 
+                          ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' 
+                          : 'text-emerald-800 bg-emerald-100 border-emerald-300'
+                      }`}>
                         {isAr ? 'منح متوفرة' : 'Scholarships'}
                       </span>
                     </div>
@@ -381,14 +505,16 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   <div className="flex flex-col gap-2 pt-1">
                     <button
                       onClick={() => onOpenApplication(selectedCountry)}
-                      className="w-full py-3 rounded-xl font-black text-xs bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 text-slate-950 flex items-center justify-center gap-2 shadow-md"
+                      className="w-full py-3 rounded-xl font-black text-xs bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 text-slate-950 flex items-center justify-center gap-2 shadow-md cursor-pointer"
                     >
                       <GraduationCap className="w-4 h-4" />
                       <span>{isAr ? 'ثبت طلبك واستلم القبول المبدئي' : 'Lock in Your Application'}</span>
                     </button>
                     <button
                       onClick={() => setCalculatedResult(false)}
-                      className="w-full py-2 rounded-lg text-slate-400 hover:text-white text-[11px] text-center"
+                      className={`w-full py-2 rounded-lg text-[11px] text-center cursor-pointer transition-colors ${
+                        isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-800'
+                      }`}
                     >
                       {isAr ? 'إعادة الحساب بتخصص أو دولة أخرى' : 'Recalculate with different criteria'}
                     </button>

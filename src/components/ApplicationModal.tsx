@@ -28,6 +28,7 @@ interface ApplicationModalProps {
   prefillCountry?: DestinationCountry;
   prefillUniversity?: University | null;
   onSubmitSuccess: (newAppNumber: string, appData?: any) => void;
+  onNavigateToPortal?: () => void;
 }
 
 export const ApplicationModal: React.FC<ApplicationModalProps> = ({
@@ -38,6 +39,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
   prefillCountry = 'uk',
   prefillUniversity = null,
   onSubmitSuccess,
+  onNavigateToPortal,
 }) => {
   if (!isOpen) return null;
 
@@ -95,23 +97,40 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
     setIsSubmitting(false);
     setStep(3);
 
-    const appData = {
+    const fullApp: Application = res.data || {
+      id: `app-${Date.now()}`,
       applicationNumber: appNum,
       studentName: fullName,
-      studentPhone: phone,
       studentEmail: email,
+      studentPhone: phone,
+      countryOfResidence: 'الخليج العربي',
       destination,
       universityName: preferredUniversity || (destination === 'uk' ? 'University of Manchester' : destination === 'australia' ? 'University of Sydney' : 'University of Auckland'),
-      studyLevel,
+      level: studyLevel,
       courseName: majorInterest,
-      optInWhatsapp,
-      optInTelegram,
-      telegramUsername,
-      selectedOptionalServices,
-      timestamp: new Date().toISOString(),
+      intake: 'سبتمبر 2026',
+      status: 'under_review',
+      submittedAt: new Date().toISOString().split('T')[0],
+      updatedAt: new Date().toISOString().split('T')[0],
+      counselorId: 'c-1',
+      counselorName: 'د. فيصل الشمري',
+      counselorPhone: '+966 50 123 4567',
+      portalPassword: Math.floor(100000 + Math.random() * 900000).toString(),
+      scholarshipInterest: hasSponsorship === 'yes',
+      documents: [
+        { id: 'doc-pass', category: 'passport', nameAr: 'صورة جواز السفر', nameEn: 'Passport Copy', status: 'uploaded', fileName: 'passport.pdf', required: true },
+        { id: 'doc-cert', category: 'transcript', nameAr: 'كشف الدرجات الأكاديمي', nameEn: 'Academic Transcript', status: 'uploaded', fileName: 'transcript.pdf', required: true },
+      ],
+      timeline: [
+        { stage: 'submitted', titleAr: 'تم استلام الطلب', titleEn: 'Application Submitted', descriptionAr: 'تم تسجيل الطلب وتعيين مستشارك الخاص', descriptionEn: 'Application received', date: new Date().toISOString().split('T')[0], isCompleted: true, isCurrent: false },
+        { stage: 'under_review', titleAr: 'تدقيق الأوراق والأهلية', titleEn: 'Document Verification', descriptionAr: 'جاري فحص المستندات بواسطة المستشار الأكاديمي', descriptionEn: 'Verifying certificates', date: new Date().toISOString().split('T')[0], isCompleted: true, isCurrent: true },
+        { stage: 'sent_to_university', titleAr: 'التقديم للجامعة الشريكة', titleEn: 'Submitted to University', descriptionAr: 'تقديم الملف عبر البوابة الرسمية', descriptionEn: 'Application submission', isCompleted: false, isCurrent: false },
+        { stage: 'conditional_offer', titleAr: 'صدور القبول المشروط المجاني', titleEn: 'Conditional Offer', descriptionAr: 'إصدار العرض خلال 3-5 أيام عمل', descriptionEn: 'Issuing offer letter', isCompleted: false, isCurrent: false },
+      ],
+      notes: [`الوجهة المفضلة: ${destination}`, `التخصص: ${majorInterest}`],
     };
 
-    onSubmitSuccess(appNum, appData);
+    onSubmitSuccess(appNum, fullApp);
   };
 
   return (
@@ -501,10 +520,15 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
 
             <div className="pt-3">
               <button
-                onClick={onClose}
+                onClick={() => {
+                  onClose();
+                  if (onNavigateToPortal) {
+                    onNavigateToPortal();
+                  }
+                }}
                 className="w-full py-3.5 rounded-xl font-black text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 cursor-pointer shadow transition-transform active:scale-98"
               >
-                {isAr ? 'متابعة الطلب في بوابة الطالب' : 'Continue to Student Portal'}
+                {isAr ? 'متابعة الطلب في بوابة الطالب ➔' : 'Continue to Student Portal ➔'}
               </button>
             </div>
           </div>

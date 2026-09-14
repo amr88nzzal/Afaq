@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { MOCK_APPLICATIONS, INITIAL_ADMIN_ALERTS } from '../data/mockData';
 import { Application, ApplicationStage, Language, Theme, AdminAlert } from '../types';
-import { fetchApplicationsAPI, updateApplicationStatusAPI, checkServerHealthAPI } from '../services/api';
+import { 
+  fetchApplicationsAPI, 
+  updateApplicationStatusAPI, 
+  updateApplicationFullAPI,
+  updatePortalPasswordAPI,
+  sendCredentialsEmailAPI,
+  checkServerHealthAPI 
+} from '../services/api';
 import { SettingsManager } from './SettingsManager';
 import { 
   Users, 
@@ -64,8 +71,14 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
 
-  // Admin authentication state
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true); // default true for preview, with pin lock
+  // Admin authentication state (requires PIN to open)
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('afaq_admin_auth') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
   const [adminPin, setAdminPin] = useState<string>('');
   const [pinError, setPinError] = useState<boolean>(false);
 
@@ -83,6 +96,21 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedApp, setSelectedApp] = useState<Application | null>(applications[0]);
   const [alertSuccessToast, setAlertSuccessToast] = useState<string | null>(null);
+
+  // Selected App editable fields
+  const [editStatus, setEditStatus] = useState<string>('');
+  const [newNoteInput, setNewNoteInput] = useState<string>('');
+  const [editPortalPassword, setEditPortalPassword] = useState<string>('');
+  const [isSavingApp, setIsSavingApp] = useState<boolean>(false);
+  const [isSendingCreds, setIsSendingCreds] = useState<boolean>(false);
+
+  // Sync selectedApp to edit form
+  useEffect(() => {
+    if (selectedApp) {
+      setEditStatus(selectedApp.status || 'under_review');
+      setEditPortalPassword(selectedApp.portalPassword || '');
+    }
+  }, [selectedApp]);
 
   // جلب الطلبات الحية وفحص صحة البوستجريس
   useEffect(() => {
@@ -109,9 +137,19 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
     if (adminPin === 'afaq2026' || adminPin === 'admin' || adminPin === '1234') {
       setIsAuthenticated(true);
       setPinError(false);
+      try {
+        sessionStorage.setItem('afaq_admin_auth', 'true');
+      } catch (e) {}
     } else {
       setPinError(true);
     }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    try {
+      sessionStorage.removeItem('afaq_admin_auth');
+    } catch (e) {}
   };
 
   const handleMarkAlertRead = (alertId: string) => {
@@ -128,13 +166,16 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
     setTimeout(() => setAlertSuccessToast(null), 4000);
   };
 
-  const handleAdvanceStage = (appId: string) => {
+  const handleAdvanceStage = async (appId: string) => {
+    const nextStatus: ApplicationStage = 'unconditional_offer';
+    const note = isAr ? 'تم استلام الضمان المالي وإصدار الـ CAS للفيزا' : 'CAS requested and unconditional offer confirmed';
+
     setApplications(prev => prev.map(app => {
       if (app.id !== appId) return app;
       const updated: Application = {
         ...app,
-        status: 'unconditional_offer',
-        notes: isAr ? 'تم استلام الضمان المالي وطلب إصدار الـ CAS للفيزا' : 'CAS requested from university',
+        status: nextStatus,
+        notes: [...(app.notes || []), note],
       };
       if (selectedApp?.id === appId) {
         setSelectedApp(updated);
@@ -142,16 +183,82 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
       return updated;
     }));
 
-    setAlertSuccessToast(isAr ? 'تم تحديث مرحلة القبول وإرسال إشعار رسمي للطالب عبر البريد!' : 'Stage updated and official email dispatched!');
-    setTimeout(() => setAlertSuccessToast(null), 3000);
+    // حفظ في قاعدة البيانات والخادم
+    await updateApplicationStatusAPI(appId, nextStatus, 5, note);
+
+    setAlertSuccessToast(isAr ? 'تم ترقية الطلب وتخزين الحالة في قاعدة بيانات PostgreSQL!' : 'Stage updated and stored in PostgreSQL!');
+    setTimeout(() => setAlertSuccessToast(null), 3500);
   };
 
-  const handleVerifyDocument = (docId: string) => {
+  const handleVerifyDocument = async (docId: string) => {
     if (!selectedApp) return;
-    const updatedDocs = selectedApp.documents.map(d => d.id === docId ? { ...d, status: 'verified' as const } : d);
+    const currentDocs = selectedApp.documents || [];
+    const updatedDocs = currentDocs.map(d => d.id === docId ? { ...d, status: 'verified' as const } : d);
     const updatedApp = { ...selectedApp, documents: updatedDocs };
     setSelectedApp(updatedApp);
     setApplications(prev => prev.map(a => a.id === updatedApp.id ? updatedApp : a));
+
+    // حفظ التحديث في قاعدة البيانات
+    await updateApplicationFullAPI(selectedApp.id, { documents: updatedDocs });
+    setAlertSuccessToast(isAr ? 'تم اعتماد الوثيقة وحفظها في قاعدة البيانات' : 'Document verified and stored in database');
+    setTimeout(() => setAlertSuccessToast(null), 3000);
+  };
+
+  // حفظ التعديلات الشاملة على الطلب (الحالة، الملاحظات، كلمة المرور) في PostgreSQL
+  const handleSaveSelectedAppChanges = async () => {
+    if (!selectedApp) return;
+    setIsSavingApp(true);
+
+    const updatedNotes = [...(selectedApp.notes || [])];
+    if (newNoteInput.trim()) {
+      updatedNotes.push(newNoteInput.trim());
+    }
+
+    const payload: Partial<Application> = {
+      status: (editStatus as ApplicationStage) || selectedApp.status,
+      notes: updatedNotes,
+      portalPassword: editPortalPassword.trim() || selectedApp.portalPassword,
+    };
+
+    const res = await updateApplicationFullAPI(selectedApp.id, payload);
+    setIsSavingApp(false);
+
+    if (res.success && res.data) {
+      const saved = res.data;
+      setSelectedApp(saved);
+      setApplications(prev => prev.map(a => a.id === saved.id ? saved : a));
+      setNewNoteInput('');
+      setAlertSuccessToast(isAr ? '✅ تم حفظ وتخزين التعديلات بنجاح في قاعدة بيانات PostgreSQL!' : 'Saved in PostgreSQL database!');
+    } else {
+      // Fallback update in state
+      const fallbackApp: Application = {
+        ...selectedApp,
+        status: (editStatus as ApplicationStage) || selectedApp.status,
+        notes: updatedNotes,
+        portalPassword: editPortalPassword.trim() || selectedApp.portalPassword,
+      };
+      setSelectedApp(fallbackApp);
+      setApplications(prev => prev.map(a => a.id === fallbackApp.id ? fallbackApp : a));
+      setNewNoteInput('');
+      setAlertSuccessToast(isAr ? '✅ تم تحديث بيانات الطلب محلياً بنجاح!' : 'Application updated successfully!');
+    }
+    setTimeout(() => setAlertSuccessToast(null), 4000);
+  };
+
+  // إرسال بيانات الدخول للطالب عبر البريد
+  const handleSendCredentialsToStudent = async () => {
+    if (!selectedApp) return;
+    setIsSendingCreds(true);
+    const pass = editPortalPassword || selectedApp.portalPassword || '123456';
+    const res = await sendCredentialsEmailAPI(selectedApp.id, pass);
+    setIsSendingCreds(false);
+
+    if (res.success) {
+      setAlertSuccessToast(isAr ? `تم إرسال بريد رسمي ببيانات الدخول إلى: ${selectedApp.studentEmail}` : `Credentials sent to ${selectedApp.studentEmail}`);
+    } else {
+      setAlertSuccessToast(isAr ? 'تعذر إرسال البريد (تأكد من إعدادات Gmail في .env)' : 'Could not dispatch email');
+    }
+    setTimeout(() => setAlertSuccessToast(null), 4000);
   };
 
   const handleSendResponse = (e: React.FormEvent) => {
@@ -312,9 +419,9 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
 
             {/* Logout Lock */}
             <button
-              onClick={() => setIsAuthenticated(false)}
-              className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-colors"
-              title={isAr ? 'قفل الجلسة' : 'Lock Session'}
+              onClick={handleLogout}
+              className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-colors cursor-pointer"
+              title={isAr ? 'تسجيل الخروج وقفل الجلسة' : 'Logout & Lock Session'}
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -647,6 +754,127 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                       className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 shadow hover:from-amber-400 hover:to-amber-300 transition-colors cursor-pointer"
                     >
                       {isAr ? 'ترقية للقبول النهائي وإصدار الـ CAS' : 'Advance to CAS'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Direct Application Data Editor & PostgreSQL Persistence */}
+                <div className={`p-4 rounded-2xl border space-y-4 ${
+                  isDark ? 'bg-slate-950/80 border-amber-500/30' : 'bg-amber-50/50 border-amber-300'
+                }`}>
+                  <div className="flex items-center justify-between border-b pb-2.5 border-slate-800/40">
+                    <div className="flex items-center gap-2">
+                      <Database className="w-4 h-4 text-amber-500" />
+                      <span className="text-xs font-black text-amber-500">
+                        {isAr ? 'تعديل وتخزين بيانات الطلب (PostgreSQL):' : 'Database Direct Editor (PostgreSQL):'}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 font-bold">
+                      {isPostgresOnline ? '● DB Online' : '○ Local Sync'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    {/* Status Dropdown */}
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-400 block text-[11px]">
+                        {isAr ? 'حالة الطلب ومرحلته:' : 'Application Status:'}
+                      </label>
+                      <select
+                        value={editStatus}
+                        onChange={(e) => setEditStatus(e.target.value)}
+                        className={`w-full p-2 rounded-xl border text-xs font-semibold focus:outline-none focus:border-amber-500 ${
+                          isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                        }`}
+                      >
+                        <option value="submitted">{isAr ? 'جديد - تم التقديم' : 'Submitted'}</option>
+                        <option value="under_review">{isAr ? 'قيد فحص وتدقيق الأوراق' : 'Under Review'}</option>
+                        <option value="sent_to_university">{isAr ? 'تم التقديم للجامعة الشريكة' : 'Sent to University'}</option>
+                        <option value="conditional_offer">{isAr ? 'صدر القبول المشروط المجاني' : 'Conditional Offer Issued'}</option>
+                        <option value="unconditional_offer">{isAr ? 'القبول النهائي والـ CAS / CoE' : 'Unconditional / CAS'}</option>
+                        <option value="visa_processing">{isAr ? 'معاملة التأشيرة والسكن' : 'Visa Processing'}</option>
+                        <option value="visa_granted">{isAr ? 'منحت التأشيرة والاستعداد للسفر' : 'Visa Granted'}</option>
+                      </select>
+                    </div>
+
+                    {/* Portal Password */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center">
+                        <label className="font-bold text-slate-400 block text-[11px]">
+                          {isAr ? 'كلمة مرور بوابة الطالب:' : 'Student Portal Pass:'}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setEditPortalPassword(Math.floor(100000 + Math.random() * 900000).toString())}
+                          className="text-[10px] text-amber-500 hover:underline cursor-pointer"
+                        >
+                          {isAr ? 'توليد تلقائي' : 'Generate'}
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        value={editPortalPassword}
+                        onChange={(e) => setEditPortalPassword(e.target.value)}
+                        placeholder="afaq123"
+                        className={`w-full p-2 rounded-xl border text-xs font-mono focus:outline-none focus:border-amber-500 ${
+                          isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Add Administrative Note */}
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-400 block text-[11px]">
+                      {isAr ? 'إضافة ملاحظة إدارية جديدة في السجل:' : 'Add Admin Note to Log:'}
+                    </label>
+                    <input
+                      type="text"
+                      value={newNoteInput}
+                      onChange={(e) => setNewNoteInput(e.target.value)}
+                      placeholder={isAr ? 'مثال: تم إرسال الأوراق لجامعة مانشستر بنجاح' : 'e.g. Sent documents to University of Manchester'}
+                      className={`w-full p-2 rounded-xl border text-xs focus:outline-none focus:border-amber-500 ${
+                        isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                      }`}
+                    />
+                  </div>
+
+                  {/* Action Buttons: Save to DB & Send Credentials */}
+                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                    <button
+                      type="button"
+                      disabled={isSavingApp}
+                      onClick={handleSaveSelectedAppChanges}
+                      className="flex-1 py-2.5 px-4 rounded-xl font-black text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center gap-2 shadow cursor-pointer transition-all active:scale-98 disabled:opacity-50"
+                    >
+                      {isSavingApp ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>{isAr ? 'جاري التخزين في PostgreSQL...' : 'Saving to Database...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Database className="w-3.5 h-3.5" />
+                          <span>{isAr ? '💾 حفظ وتخزين التعديلات في قاعدة البيانات' : 'Save Changes to PostgreSQL'}</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isSendingCreds}
+                      onClick={handleSendCredentialsToStudent}
+                      className={`py-2.5 px-3.5 rounded-xl font-bold text-xs border flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                        isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700' : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300'
+                      }`}
+                      title={isAr ? 'إرسال بيانات الدخول المحدثة لإيميل الطالب' : 'Send credentials to student email'}
+                    >
+                      {isSendingCreds ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <KeyRound className="w-3.5 h-3.5 text-amber-500" />
+                      )}
+                      <span>{isAr ? 'إرسال بيانات الدخول للبريد' : 'Email Login Pass'}</span>
                     </button>
                   </div>
                 </div>

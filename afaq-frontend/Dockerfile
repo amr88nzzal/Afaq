@@ -20,8 +20,12 @@ RUN npx vite build
 # المرحلة 2: خادم Nginx خفيف وعالي السرعة
 FROM nginx:alpine AS runner
 
-# نسخ ملفات الويب الجاهزة
+# نسخ ملفات الويب الجاهزة الناتجة عن البناء
 COPY --from=builder /app/dist /usr/share/nginx/html
+
+# نسخ مباشر صريح لمجلد الصور والشعار لضمان توفرها 100%
+COPY public/images /usr/share/nginx/html/images
+COPY public /usr/share/nginx/html
 
 # نسخ إعدادات Nginx المخصصة لدعم التوجيه ومسارات /api/
 COPY ./afaq-frontend/nginx.conf /etc/nginx/conf.d/default.conf

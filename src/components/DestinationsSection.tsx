@@ -112,6 +112,17 @@ export const DestinationsSection: React.FC<DestinationsSectionProps> = ({
                 src={countryData.heroImage} 
                 alt={countryData.nameAr}
                 className="w-full h-full object-cover object-center"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  const fallback = activeCountry === 'uk'
+                    ? 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=800&auto=format&fit=crop&q=80'
+                    : activeCountry === 'australia'
+                    ? 'https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?w=800&auto=format&fit=crop&q=80'
+                    : 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800&auto=format&fit=crop&q=80';
+                  if (target.src !== fallback) {
+                    target.src = fallback;
+                  }
+                }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent lg:bg-gradient-to-r lg:from-transparent lg:to-slate-900" />
               

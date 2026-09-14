@@ -146,6 +146,18 @@ export const UniversitiesDirectory: React.FC<UniversitiesDirectoryProps> = ({
                     src={univ.image} 
                     alt={univ.nameAr}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    onError={(e) => {
+                      // Fallback image if local file fails
+                      const target = e.currentTarget;
+                      const fallback = univ.country === 'uk'
+                        ? 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=600&auto=format&fit=crop&q=80'
+                        : univ.country === 'australia'
+                        ? 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=600&auto=format&fit=crop&q=80'
+                        : 'https://images.unsplash.com/photo-1498243691581-b145c3f54a5a?w=600&auto=format&fit=crop&q=80';
+                      if (target.src !== fallback) {
+                        target.src = fallback;
+                      }
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
                   

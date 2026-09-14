@@ -153,6 +153,24 @@ export async function updateApplicationStatusAPI(id: string, status: string, sta
 }
 
 /**
+ * تحديث وتخزين بيانات الطلب الكاملة في قاعدة بيانات PostgreSQL
+ */
+export async function updateApplicationFullAPI(id: string, updates: Partial<Application>): Promise<{ success: boolean; data?: Application }> {
+  try {
+    const res = await fetch(`/api/applications/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    const json = await res.json();
+    return { success: json.success === true, data: json.data };
+  } catch (err) {
+    console.error('❌ [API Client] خطأ في حفظ بيانات الطلب:', err);
+    return { success: false };
+  }
+}
+
+/**
  * فحص صحة اتصال السيرفر وقاعدة البيانات
  */
 export async function checkServerHealthAPI(): Promise<{ ok: boolean; postgres: boolean }> {
@@ -165,3 +183,56 @@ export async function checkServerHealthAPI(): Promise<{ ok: boolean; postgres: b
     return { ok: false, postgres: false };
   }
 }
+
+/**
+ * تسجيل دخول بوابة الطالب المخصصة
+ */
+export async function studentPortalLoginAPI(loginId: string, password: string): Promise<{ success: boolean; data?: Application; error?: string }> {
+  try {
+    const res = await fetch('/api/applications/portal-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loginId, password }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      return { success: false, error: json.error || 'فشل تسجيل الدخول' };
+    }
+    return { success: true, data: json.data };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'تعذر الاتصال بالخادم' };
+  }
+}
+
+/**
+ * تحديث كلمة مرور الطالب من قبل المشرف
+ */
+export async function updatePortalPasswordAPI(appId: string, newPassword: string): Promise<{ success: boolean; message?: string }> {
+  try {
+    const res = await fetch(`/api/applications/${appId}/portal-password`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newPassword }),
+    });
+    const json = await res.json();
+    return { success: json.success === true, message: json.message || json.error };
+  } catch (err: any) {
+    return { success: false, message: err.message };
+  }
+}
+
+/**
+ * إرسال أو إعادة إرسال بيانات الدخول إلى إيميل الطالب عبر Gmail
+ */
+export async function sendCredentialsEmailAPI(appId: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const res = await fetch(`/api/applications/${appId}/send-credentials`, {
+      method: 'POST',
+    });
+    const json = await res.json();
+    return { success: json.success === true, message: json.message || json.error };
+  } catch (err: any) {
+    return { success: false, message: err.message || 'تعذر إرسال البريد' };
+  }
+}
+

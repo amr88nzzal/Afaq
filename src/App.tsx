@@ -45,7 +45,13 @@ export default function App() {
   const [isCounselorBookingOpen, setIsCounselorBookingOpen] = useState<boolean>(false);
 
   // Active student application for the portal demo
-  const [activeStudentApp, setActiveStudentApp] = useState(MOCK_APPLICATIONS[0]);
+  const [activeStudentApp, setActiveStudentApp] = useState<Application | null>(() => {
+    try {
+      const saved = localStorage.getItem('afaq_active_app');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return MOCK_APPLICATIONS[0] || null;
+  });
 
   // Selected Logo Option (Option 1 was confirmed by user)
   const [selectedLogoId, setSelectedLogoId] = useState<number>(1);
@@ -115,7 +121,9 @@ export default function App() {
     setActiveNotification({
       id: Date.now().toString(),
       type: channel,
+      channel,
       title: title || channelTitles[channel],
+      body: message || channelBodies[channel],
       message: message || channelBodies[channel],
       timestamp: new Date().toLocaleTimeString(isAr ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' }),
     });
@@ -136,10 +144,18 @@ export default function App() {
   };
 
   const handleUpdateStudentDocument = (docId: string, fileName: string) => {
-    setActiveStudentApp(prev => ({
-      ...prev,
-      documents: prev.documents.map(d => d.id === docId ? { ...d, fileName, status: 'uploaded' } : d),
-    }));
+    setActiveStudentApp(prev => {
+      if (!prev) return null;
+      const currentDocs = prev.documents || [];
+      const updated = {
+        ...prev,
+        documents: currentDocs.map(d => d.id === docId ? { ...d, fileName, status: 'uploaded' as const } : d),
+      };
+      try {
+        localStorage.setItem('afaq_active_app', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
 
     triggerNotification('whatsapp', 
       isAr ? 'تم استلام وثيقتك بنجاح' : 'Document Received',
@@ -272,7 +288,7 @@ export default function App() {
                     <div>
                       <div className="relative h-48 overflow-hidden">
                         <img 
-                          src="/src/assets/images/uk_university_campus_1789309583030.jpg" 
+                          src="/images/uk.jpg" 
                           alt="UK Campus"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
@@ -323,7 +339,7 @@ export default function App() {
                     <div>
                       <div className="relative h-48 overflow-hidden">
                         <img 
-                          src="/src/assets/images/australia_sydney_study_1789309600109.jpg" 
+                          src="/images/australia.jpg" 
                           alt="Australia Campus"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
@@ -374,7 +390,7 @@ export default function App() {
                     <div>
                       <div className="relative h-48 overflow-hidden">
                         <img 
-                          src="/src/assets/images/new_zealand_auckland_study_1789309618151.jpg" 
+                          src="/images/new_zealand.jpg" 
                           alt="New Zealand Campus"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
@@ -645,6 +661,19 @@ export default function App() {
             application={activeStudentApp}
             onUpdateDocument={handleUpdateStudentDocument}
             onTriggerNotificationTest={(channel) => triggerNotification(channel)}
+            onLoginSuccess={(app) => {
+              setActiveStudentApp(app);
+              try {
+                localStorage.setItem('afaq_active_app', JSON.stringify(app));
+              } catch (e) {}
+            }}
+            onLogout={() => {
+              setActiveStudentApp(null);
+              try {
+                localStorage.removeItem('afaq_active_app');
+              } catch (e) {}
+            }}
+            onOpenApplyModal={() => handleOpenApplicationWithCountry()}
           />
         )}
 
@@ -721,11 +750,21 @@ export default function App() {
         lang={lang}
         prefillCountry={selectedDestinationCountry}
         prefillUniversity={selectedUniversity}
-        onSubmitSuccess={(newAppNum) => {
+        onSubmitSuccess={(newAppNum, fullApp) => {
+          if (fullApp) {
+            setActiveStudentApp(fullApp);
+            try {
+              localStorage.setItem('afaq_active_app', JSON.stringify(fullApp));
+            } catch (e) {}
+          }
           triggerNotification('whatsapp', 
             isAr ? `تم إنشاء طلبك بنجاح (${newAppNum})` : `Application Created (${newAppNum})`,
             isAr ? `مرحباً بك في آفاق العالمية! تم تعيين مستشارك وسيتواصل معك عبر الواتساب.` : `Welcome to Afaq! Your advisor has been assigned.`
           );
+        }}
+        onNavigateToPortal={() => {
+          setActiveView('student-portal');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
       />
 

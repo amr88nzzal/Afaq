@@ -19,7 +19,7 @@ import applicationsRoutes from './server/routes/applicationsRoutes';
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   // قراءة مدخلات الـ JSON والنماذج في الطلبات
   app.use(express.json({ limit: '10mb' }));
@@ -49,6 +49,13 @@ async function startServer() {
 
   // مسار طلبات القبول والطلاب وبوابة المتابعة
   app.use('/api/applications', applicationsRoutes);
+
+  // --------------------------------------------------------------------------
+  // خدمة الملفات الثابتة والصور الرسمية (Public Static Assets & Images)
+  // --------------------------------------------------------------------------
+  const publicPath = path.join(process.cwd(), 'public');
+  app.use(express.static(publicPath));
+  app.use('/images', express.static(path.join(publicPath, 'images')));
 
   // --------------------------------------------------------------------------
   // خادم الواجهة الأمامية (Vite Middleware in Dev / Static Files in Prod)

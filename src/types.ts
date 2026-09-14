@@ -12,7 +12,9 @@ export type ApplicationStage =
   | 'conditional_offer'
   | 'unconditional_offer'
   | 'visa_processing'
-  | 'approved_ready';
+  | 'visa_prep'
+  | 'approved_ready'
+  | 'enrolled';
 
 export interface NotificationPreferences {
   officialEmail: boolean; // Primary official response channel
@@ -56,7 +58,7 @@ export interface DocumentItem {
   id: string;
   nameAr: string;
   nameEn: string;
-  category: 'passport' | 'transcript' | 'english_test' | 'recommendation' | 'sop' | 'financial';
+  category: 'passport' | 'transcript' | 'english_test' | 'recommendation' | 'sop' | 'financial' | 'identity' | 'academic' | 'language' | 'financial_guarantee';
   required: boolean;
   status: 'pending' | 'uploaded' | 'verified' | 'action_needed';
   fileName?: string;
@@ -65,6 +67,7 @@ export interface DocumentItem {
 }
 
 export interface TimelineEvent {
+  id?: string;
   stage: ApplicationStage;
   titleAr: string;
   titleEn: string;

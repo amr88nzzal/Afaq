@@ -43,7 +43,9 @@ import {
   Cpu,
   HardDrive,
   Copy,
-  Terminal
+  Terminal,
+  KeyRound,
+  RefreshCw
 } from 'lucide-react';
 import { LogoRenderer } from './LogoRenderer';
 
@@ -71,14 +73,8 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
 
-  // Admin authentication state (requires PIN to open)
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem('afaq_admin_auth') === 'true';
-    } catch (e) {
-      return false;
-    }
-  });
+  // Admin authentication state (requires PIN on opening as requested)
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [adminPin, setAdminPin] = useState<string>('');
   const [pinError, setPinError] = useState<boolean>(false);
 
@@ -249,8 +245,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   const handleSendCredentialsToStudent = async () => {
     if (!selectedApp) return;
     setIsSendingCreds(true);
-    const pass = editPortalPassword || selectedApp.portalPassword || '123456';
-    const res = await sendCredentialsEmailAPI(selectedApp.id, pass);
+    const res = await sendCredentialsEmailAPI(selectedApp.id);
     setIsSendingCreds(false);
 
     if (res.success) {

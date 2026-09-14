@@ -13,7 +13,7 @@ import { ApplicationModal } from './components/ApplicationModal';
 import { CounselorBookingModal } from './components/CounselorBookingModal';
 import { NotificationToast, NotificationPayload } from './components/NotificationToast';
 import { MOCK_APPLICATIONS, TESTIMONIALS } from './data/mockData';
-import { DestinationCountry, Language, University, Theme } from './types';
+import { DestinationCountry, Language, University, Theme, Application } from './types';
 import { 
   Award, 
   ShieldCheck, 

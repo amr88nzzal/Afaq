@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DestinationCountry, Language, StudyLevel, University, Theme } from '../types';
+import { DestinationCountry, Language, StudyLevel, University, Theme, Application } from '../types';
 import { submitApplicationAPI } from '../services/api';
 import { 
   X, 

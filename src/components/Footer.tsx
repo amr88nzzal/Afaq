@@ -1,6 +1,7 @@
 import React from 'react';
 import { LogoRenderer } from './LogoRenderer';
 import { Language, Theme } from '../types';
+import { SiteSettings } from '../services/api';
 import { 
   MapPin, 
   Phone, 
@@ -11,7 +12,9 @@ import {
   GraduationCap,
   Lock,
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  Clock,
+  MessageCircle
 } from 'lucide-react';
 
 interface FooterProps {
@@ -19,6 +22,7 @@ interface FooterProps {
   theme?: Theme;
   selectedLogoId: number;
   onNavigate: (view: any) => void;
+  settings?: SiteSettings;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -26,9 +30,28 @@ export const Footer: React.FC<FooterProps> = ({
   theme = 'dark',
   selectedLogoId,
   onNavigate,
+  settings,
 }) => {
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
+
+  const companyName = isAr 
+    ? (settings?.company_name_ar || 'آفاق العالمية للخدمات التعليمية والقبولات الجامعية')
+    : (settings?.company_name_en || 'Afaq Global Education & University Placements');
+
+  const companyAddress = isAr
+    ? (settings?.company_address_ar || 'المملكة العربية السعودية، الرياض - طريق الملك فهد - برج الفيصلية، الطابق 14')
+    : (settings?.company_address_en || 'King Fahd Road, Al Faisaliah Tower, 14th Floor, Riyadh, Saudi Arabia');
+
+  const workingHours = isAr
+    ? (settings?.working_hours_ar || 'الأحد إلى الخميس: 9:00 صباحاً - 6:00 مساءً (توقيت مكة)')
+    : (settings?.working_hours_en || 'Sunday to Thursday: 9:00 AM - 6:00 PM (GMT+3)');
+
+  const phone = settings?.company_phone || '+966 50 876 5432';
+  const rawWhatsapp = settings?.company_whatsapp || '+966 50 876 5432';
+  const cleanWhatsapp = rawWhatsapp.replace(/\D/g, '') || '966508765432';
+  const email = settings?.company_email || 'admissions@afaq-global.amrodev.com';
+  const supportEmail = settings?.support_email || 'support@afaq-global.amrodev.com';
 
   return (
     <footer className={`border-t text-start transition-colors duration-200 ${
@@ -62,7 +85,7 @@ export const Footer: React.FC<FooterProps> = ({
 
             <div className="space-y-1">
               <div className="text-amber-500 font-bold text-sm flex items-center justify-center md:justify-start gap-1.5">
-                <span>💬</span>
+                <MessageCircle className="w-4 h-4" />
                 <span>{isAr ? 'تنبيهات فورية ومباشرة' : 'Instant Alerts via WhatsApp/Telegram'}</span>
               </div>
               <p className="text-xs opacity-80">
@@ -91,21 +114,21 @@ export const Footer: React.FC<FooterProps> = ({
           <div className="lg:col-span-4 space-y-4">
             <LogoRenderer optionId={selectedLogoId} variant={isDark ? 'dark' : 'light'} />
             
-            <p className="text-xs leading-relaxed max-w-sm opacity-85">
-              {isAr 
-                ? 'آفاق العالمية للخدمات الأكاديمية والقبول الجامعي: شريكك الاستراتيجي في المملكة العربية السعودية والخليج العربي لتأمين القبولات في أفضل 100 جامعة ببريطانيا، أستراليا، ونيوزيلندا.'
-                : 'Afaq Global for Academic Admissions: Your premier partner across the GCC for placements in top-tier UK, Australian, and New Zealand universities.'}
+            <p className="text-xs leading-relaxed max-w-sm opacity-85 font-medium">
+              {companyName}: {isAr 
+                ? 'شريكك المعتمد في الخليج العربي لتأمين القبولات الأكاديمية المجانية في أفضل 100 جامعة ببريطانيا، أستراليا، ونيوزيلندا.'
+                : 'Your accredited GCC partner for free academic placements in premier UK, Australian, and New Zealand universities.'}
             </p>
 
-            <div className="flex items-center gap-3 pt-2 text-xs">
+            <div className="flex items-center gap-3 pt-2 text-xs flex-wrap">
               <a 
-                href="https://wa.me/966541234567" 
+                href={`https://wa.me/${cleanWhatsapp}`} 
                 target="_blank" 
                 rel="noreferrer" 
                 className="px-3 py-1.5 rounded-lg bg-emerald-600/15 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-600/25 transition-colors flex items-center gap-1.5 font-bold"
               >
-                <span>💬</span>
-                <span>واتساب 966541234567+</span>
+                <MessageCircle className="w-3.5 h-3.5 fill-current" />
+                <span>واتساب {rawWhatsapp}</span>
               </a>
               <a 
                 href="https://t.me/Afaq_Abdulrahman" 
@@ -184,13 +207,12 @@ export const Footer: React.FC<FooterProps> = ({
                 </button>
               </li>
               <li className="pt-2 border-t border-slate-700/30">
-                {/* Dedicated link to ./admin */}
                 <button 
                   onClick={() => {
                     window.location.hash = 'admin';
                     onNavigate('staff-crm');
                   }} 
-                  className="hover:text-amber-500 transition-colors flex items-center gap-1.5 opacity-60 hover:opacity-100 text-[11px]"
+                  className="hover:text-amber-500 transition-colors flex items-center gap-1.5 opacity-70 hover:opacity-100 text-[11px]"
                 >
                   <Lock className="w-3 h-3 text-amber-500" />
                   <span>{isAr ? 'بوابة المدراء والمشرفين (./admin)' : 'Staff & Admins Portal (./admin)'}</span>
@@ -199,23 +221,27 @@ export const Footer: React.FC<FooterProps> = ({
             </ul>
           </div>
 
-          {/* Regional Offices (3 cols) */}
+          {/* Regional Offices & Contact Info (3 cols) */}
           <div className="lg:col-span-3 space-y-3">
             <h4 className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              {isAr ? 'مكاتبنا واستشاراتنا المباشرة' : 'Regional Representation'}
+              {isAr ? 'معلومات التواصل المباشر' : 'Direct Contact & Offices'}
             </h4>
-            <div className="space-y-2.5 text-xs opacity-85">
+            <div className="space-y-2.5 text-xs opacity-90">
               <div className="flex items-start gap-2">
                 <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                <span>{isAr ? 'الرياض: طريق الملك فهد، حي العليا، المملكة العربية السعودية' : 'Riyadh: King Fahd Rd, Olaya, Saudi Arabia'}</span>
+                <span>{companyAddress}</span>
               </div>
-              <div className="flex items-start gap-2">
-                <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                <span>{isAr ? 'دبي: أبراج بحيرات جميرا (JLT)، الإمارات العربية المتحدة' : 'Dubai: JLT Cluster, United Arab Emirates'}</span>
+              <div className="flex items-center gap-2">
+                <Phone className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <span dir="ltr" className="font-mono">{phone}</span>
               </div>
-              <div className="flex items-start gap-2">
-                <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                <span>{isAr ? 'لندن وميلبورن: مكاتب المتابعة الميدانية والترحيب بالطلاب' : 'London & Melbourne: Student On-Arrival Hubs'}</span>
+              <div className="flex items-center gap-2">
+                <Mail className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <span className="font-mono">{email}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <span>{workingHours}</span>
               </div>
             </div>
           </div>
@@ -227,7 +253,7 @@ export const Footer: React.FC<FooterProps> = ({
           isDark ? 'border-slate-800 text-slate-500' : 'border-slate-300 text-slate-500'
         }`}>
           <div>
-            © 2026 {isAr ? 'شركة آفاق العالمية للقبول الجامعي والدراسة في الخارج. جميع الحقوق محفوظة.' : 'Afaq Global Academic Services. All rights reserved.'}
+            © 2026 {companyName}. {isAr ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}
           </div>
           <div className="flex items-center gap-4">
             <span className="hover:text-amber-500 cursor-pointer">{isAr ? 'القبول الجامعي مجاني 100%' : '100% Free Placement'}</span>

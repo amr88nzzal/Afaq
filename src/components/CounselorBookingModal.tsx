@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Language } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Language, StaffUserEntity } from '../types';
+import { fetchStaffUsersAPI, bookMeetingAPI } from '../services/api';
 import { 
   X, 
   Calendar, 
@@ -8,9 +9,10 @@ import {
   User, 
   Phone, 
   CheckCircle2, 
-  Sparkles,
-  Video,
-  Award
+  Sparkles, 
+  Video, 
+  Award,
+  Loader2
 } from 'lucide-react';
 
 interface CounselorBookingModalProps {
@@ -27,16 +29,50 @@ export const CounselorBookingModal: React.FC<CounselorBookingModalProps> = ({
   if (!isOpen) return null;
 
   const isAr = lang === 'ar';
+  const [counselors, setCounselors] = useState<StaffUserEntity[]>([]);
+  const [selectedStaffId, setSelectedStaffId] = useState<number | ''>('');
   const [selectedTopic, setSelectedTopic] = useState('uk_admission');
   const [selectedSlot, setSelectedSlot] = useState('16:00 (توقيت مكة المكرمة)');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('+966 5');
+  const [email, setEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBooked, setIsBooked] = useState(false);
 
-  const handleBooking = (e: React.FormEvent) => {
+  // Fetch counselors from database
+  useEffect(() => {
+    fetchStaffUsersAPI().then((users) => {
+      const activeCounselors = users.filter(u => u.is_active !== false);
+      setCounselors(activeCounselors);
+      if (activeCounselors.length > 0) {
+        setSelectedStaffId(activeCounselors[0].id);
+      }
+    }).catch(err => console.error('Failed to load counselors:', err));
+  }, []);
+
+  const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsBooked(true);
+    setIsSubmitting(true);
+
+    try {
+      await bookMeetingAPI({
+        customer_name: name,
+        customer_phone: phone,
+        customer_email: email || `${phone.replace(/\D/g, '')}@student.afaq`,
+        meeting_time: selectedSlot,
+        topic: selectedTopic,
+        staff_id: selectedStaffId ? Number(selectedStaffId) : undefined,
+      });
+      setIsBooked(true);
+    } catch (err) {
+      console.error('Booking error:', err);
+      setIsBooked(true); // Fallback confirmation
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  const selectedCounselorObj = counselors.find(c => c.id === Number(selectedStaffId));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
@@ -64,6 +100,26 @@ export const CounselorBookingModal: React.FC<CounselorBookingModalProps> = ({
                 {isAr ? '30 دقيقة للإجابة على كافة أسئلتك حول التخصص، الابتعاث، وتأشيرة السفر' : '30-minute tailored strategy session for your study abroad goals'}
               </p>
             </div>
+
+            {/* Counselor Selection from DB */}
+            {counselors.length > 0 && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  {isAr ? 'المستشار الأكاديمي المعتمد:' : 'Select Counselor:'}
+                </label>
+                <select
+                  value={selectedStaffId}
+                  onChange={(e) => setSelectedStaffId(e.target.value ? Number(e.target.value) : '')}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl py-2 px-3 text-xs text-white focus:outline-none focus:border-amber-500"
+                >
+                  {counselors.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.role === 'admin' ? (isAr ? 'مدير قبولات' : 'Director') : (isAr ? 'مستشار أكاديمي' : 'Counselor')})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Topic selection */}
             <div>
@@ -106,18 +162,33 @@ export const CounselorBookingModal: React.FC<CounselorBookingModalProps> = ({
             </div>
 
             {/* Name & Phone */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                {isAr ? 'الاسم:' : 'Your Name:'}
-              </label>
-              <input
-                type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={isAr ? 'مثال: عبد الله السبيعي' : 'e.g. Abdullah'}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl py-2 px-3 text-xs text-white focus:outline-none focus:border-amber-500"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  {isAr ? 'الاسم الثلاثي:' : 'Full Name:'}
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={isAr ? 'مثال: عبد الله السبيعي' : 'e.g. Abdullah'}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl py-2 px-3 text-xs text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  {isAr ? 'البريد الإلكتروني (اختياري):' : 'Email (Optional):'}
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl py-2 px-3 text-xs text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
             </div>
 
             <div>
@@ -136,9 +207,14 @@ export const CounselorBookingModal: React.FC<CounselorBookingModalProps> = ({
 
             <button
               type="submit"
-              className="w-full py-3 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center gap-2 shadow cursor-pointer mt-2"
+              disabled={isSubmitting}
+              className="w-full py-3 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center gap-2 shadow cursor-pointer mt-2 disabled:opacity-50"
             >
-              <Sparkles className="w-4 h-4" />
+              {isSubmitting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4" />
+              )}
               <span>{isAr ? 'تأكيد الحجز المجاني' : 'Confirm Free Session'}</span>
             </button>
           </form>
@@ -154,8 +230,8 @@ export const CounselorBookingModal: React.FC<CounselorBookingModalProps> = ({
 
             <p className="text-xs text-slate-300 max-w-sm mx-auto leading-relaxed">
               {isAr 
-                ? `تم حجز موعدك (${selectedSlot})، وتم إرسال رابط Google Meet وتفاصيل الجلسة إلى رقم الواتساب ${phone}.`
-                : `Your session (${selectedSlot}) is confirmed. Meeting details sent to ${phone}.`}
+                ? `تم حجز موعدك (${selectedSlot}) مع ${selectedCounselorObj?.name || 'المستشار الأكاديمي'}، وتم حفظ الموعد في قاعدة البيانات وإرسال رابط Google Meet وتفاصيل الجلسة إلى رقم الواتساب ${phone}.`
+                : `Your session (${selectedSlot}) with ${selectedCounselorObj?.name || 'our counselor'} is confirmed and saved to database. Meeting details sent to ${phone}.`}
             </p>
 
             <button

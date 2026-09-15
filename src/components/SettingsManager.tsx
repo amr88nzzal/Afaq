@@ -39,9 +39,10 @@ import {
 interface SettingsManagerProps {
   lang: Language;
   theme: Theme;
+  onSettingsUpdated?: () => void;
 }
 
-export const SettingsManager: React.FC<SettingsManagerProps> = ({ lang, theme }) => {
+export const SettingsManager: React.FC<SettingsManagerProps> = ({ lang, theme, onSettingsUpdated }) => {
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
 
@@ -81,6 +82,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ lang, theme })
     setIsSaving(false);
     if (ok) {
       setSaveSuccess(true);
+      if (onSettingsUpdated) onSettingsUpdated();
       setTimeout(() => setSaveSuccess(false), 4000);
     }
   };

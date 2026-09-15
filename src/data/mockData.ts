@@ -234,11 +234,11 @@ export const INITIAL_APPLICATIONS: Application[] = [
     counselorPhone: '+966 54 123 4567',
     scholarshipInterest: true,
     documents: [
-      { id: 'd1', nameAr: 'جواز السفر ساري المفعول', nameEn: 'Valid Passport', category: 'passport', required: true, status: 'verified', fileName: 'passport_mohammed.pdf', uploadedAt: '2026-08-14' },
-      { id: 'd2', nameAr: 'شهادة الثانوية العامة وكشف الدرجات (مترجم)', nameEn: 'High School Certificate & Transcript', category: 'transcript', required: true, status: 'verified', fileName: 'transcript_attested.pdf', uploadedAt: '2026-08-14' },
-      { id: 'd3', nameAr: 'نتيجة اختبار الآيلتس (IELTS Academic)', nameEn: 'IELTS Academic Test Result', category: 'english_test', required: true, status: 'verified', fileName: 'ielts_score_6.5.pdf', uploadedAt: '2026-08-18' },
-      { id: 'd4', nameAr: 'خطاب الغرض من الدراسة (Personal Statement / SOP)', nameEn: 'Statement of Purpose (SOP)', category: 'sop', required: true, status: 'verified', fileName: 'sop_engineering_final.pdf', uploadedAt: '2026-08-20' },
-      { id: 'd5', nameAr: 'خطاب الضمان المالي أو إفادة الابتعاث', nameEn: 'Financial Guarantee Letter', category: 'financial', required: true, status: 'uploaded', fileName: 'bank_statement_sponsor.pdf', uploadedAt: '2026-09-10' },
+      { id: 'd1', nameAr: 'جواز السفر ساري المفعول', nameEn: 'Valid Passport Copy', category: 'passport', required: true, status: 'pending' },
+      { id: 'd2', nameAr: 'شهادة الثانوية العامة وكشف الدرجات', nameEn: 'High School Certificate & Transcript', category: 'transcript', required: true, status: 'pending' },
+      { id: 'd3', nameAr: 'نتيجة اختبار اللغة الإنجليزية (IELTS / PTE إن وجد)', nameEn: 'English Test Score (IELTS / PTE / Duolingo)', category: 'english_test', required: false, status: 'pending' },
+      { id: 'd4', nameAr: 'خطاب الغرض من الدراسة (Personal Statement)', nameEn: 'Personal Statement / SOP', category: 'sop', required: false, status: 'pending' },
+      { id: 'd5', nameAr: 'الضمان المالي أو كشف الحساب البنكي', nameEn: 'Financial Guarantee / Bank Statement', category: 'financial', required: true, status: 'pending' },
     ],
     timeline: [
       { stage: 'submitted', titleAr: 'تم استلام الطلب', titleEn: 'Application Submitted', descriptionAr: 'تم تسجيل الطلب وتعيين مستشارك التعليمي الخاص', descriptionEn: 'Application received and personal counselor assigned', date: '2026-08-14', isCompleted: true, isCurrent: false },

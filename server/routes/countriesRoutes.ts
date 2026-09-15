@@ -119,21 +119,26 @@ router.delete('/:id', async (req: Request, res: Response) => {
     const id = parseInt(req.params.id, 10);
 
     if (isPostgresConnected) {
-      // Disassociate any universities or applications referencing this country first if needed
-      await pool.query('UPDATE universities SET country_id = NULL WHERE country_id = $1', [id]);
-      await pool.query('UPDATE applications SET country_id = NULL WHERE country_id = $1', [id]);
-      const result = await pool.query('DELETE FROM countries WHERE id = $1 RETURNING id', [id]);
-      if (result.rowCount === 0) {
-        return res.status(404).json({ success: false, error: 'الدولة غير موجودة في قاعدة البيانات' });
+      // Safely disassociate any universities or applications referencing this country first
+      try {
+        await pool.query('UPDATE universities SET country_id = NULL WHERE country_id = $1', [id]);
+      } catch (e: any) {
+        console.warn('Could not nullify universities.country_id:', e.message);
       }
+
+      try {
+        await pool.query('UPDATE applications SET country_id = NULL WHERE country_id = $1', [id]);
+      } catch (e: any) {
+        console.warn('Could not nullify applications.country_id:', e.message);
+      }
+
+      const result = await pool.query('DELETE FROM countries WHERE id = $1 RETURNING id', [id]);
+      // Also sync in-memory cache
+      inMemoryStore.countries = inMemoryStore.countries.filter(c => Number(c.id) !== id);
       return res.json({ success: true, message: 'تم حذف الدولة بنجاح' });
     }
 
-    const prevLen = inMemoryStore.countries.length;
     inMemoryStore.countries = inMemoryStore.countries.filter(c => Number(c.id) !== id);
-    if (inMemoryStore.countries.length === prevLen) {
-      return res.status(404).json({ success: false, error: 'الدولة غير موجودة' });
-    }
     return res.json({ success: true, message: 'تم حذف الدولة بنجاح' });
   } catch (error: any) {
     return res.status(500).json({ success: false, error: error.message });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Application, DocumentItem, Language, Theme, TimelineEvent } from '../types';
 import { 
   CheckCircle2, 
@@ -29,7 +29,14 @@ import {
   Copy,
   ArrowRight,
   ArrowLeft,
-  ChevronRight
+  ChevronRight,
+  Trash2,
+  Eye,
+  Plus,
+  FileUp,
+  X,
+  CheckCircle,
+  FileCheck2
 } from 'lucide-react';
 import { studentPortalLoginAPI } from '../services/api';
 
@@ -44,8 +51,8 @@ const DEFAULT_TIMELINE: TimelineEvent[] = [
 ];
 
 const DEFAULT_DOCUMENTS: DocumentItem[] = [
-  { id: 'doc-pass', category: 'passport', nameAr: 'صورة جواز السفر (ساري المفعول)', nameEn: 'Valid Passport Copy', status: 'uploaded', fileName: 'passport_scan.pdf', required: true },
-  { id: 'doc-cert', category: 'transcript', nameAr: 'كشف الدرجات والشهادة الأخيرة', nameEn: 'Academic Transcripts & Certificate', status: 'uploaded', fileName: 'high_school_grades.pdf', required: true },
+  { id: 'doc-pass', category: 'passport', nameAr: 'صورة جواز السفر (ساري المفعول)', nameEn: 'Valid Passport Copy', status: 'pending', required: true },
+  { id: 'doc-cert', category: 'transcript', nameAr: 'كشف الدرجات والشهادة الأخيرة', nameEn: 'Academic Transcripts & Certificate', status: 'pending', required: true },
   { id: 'doc-lang', category: 'english_test', nameAr: 'شهادة اللغة (آيلتس / توفل إن وجدت)', nameEn: 'English Test Score (IELTS / PTE / Duolingo)', status: 'pending', required: false },
   { id: 'doc-fin', category: 'financial_guarantee', nameAr: 'الضمان المالي أو كشف الحساب البنكي', nameEn: 'Financial Guarantee / Bank Statement', status: 'pending', required: true },
 ];
@@ -54,7 +61,18 @@ interface StudentDashboardProps {
   lang: Language;
   theme?: Theme;
   application: Application | null;
-  onUpdateDocument: (docId: string, fileName: string) => void;
+  onUpdateDocument: (
+    docId: string, 
+    fileName: string, 
+    extraData?: {
+      fileSize?: string;
+      fileUrl?: string;
+      docType?: string;
+      nameAr?: string;
+      nameEn?: string;
+    }
+  ) => void;
+  onDeleteDocument?: (docId: string) => void;
   onTriggerNotificationTest: (channel: 'whatsapp' | 'telegram' | 'email') => void;
   onLoginSuccess?: (app: Application) => void;
   onLogout?: () => void;
@@ -66,6 +84,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   theme = 'dark',
   application,
   onUpdateDocument,
+  onDeleteDocument,
   onTriggerNotificationTest,
   onLoginSuccess,
   onLogout,
@@ -88,8 +107,22 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const [studentPhone, setStudentPhone] = useState<string>(application?.studentPhone || '');
   const [telegramUser, setTelegramUser] = useState<string>('@m_student');
 
-  // Interactive upload state
+  // Real upload state and feedback
   const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const [dragOverDocId, setDragOverDocId] = useState<string | null>(null);
+
+  // Add custom extra document modal state
+  const [isAddDocModalOpen, setIsAddDocModalOpen] = useState<boolean>(false);
+  const [newDocNameAr, setNewDocNameAr] = useState<string>('');
+  const [newDocNameEn, setNewDocNameEn] = useState<string>('');
+  const [newDocCategory, setNewDocCategory] = useState<string>('other');
+  const [newDocFile, setNewDocFile] = useState<File | null>(null);
+  const [isSubmittingNewDoc, setIsSubmittingNewDoc] = useState<boolean>(false);
+
+  // Preview document modal
+  const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
 
   // Chat message state
   const [chatMessages, setChatMessages] = useState<{ id: string; sender: 'student' | 'counselor'; text: string; time: string }[]>([
@@ -172,19 +205,127 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     }, 1000);
   };
 
-  const handleSimulatedFileUpload = (docId: string) => {
+  // Maximum file size: 5 MB in bytes
+  const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+  const ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'webp'];
+
+  const validateAndUploadFile = (
+    docId: string, 
+    file: File, 
+    meta?: { nameAr?: string; nameEn?: string; docType?: string }
+  ) => {
+    setUploadError(null);
+
+    // 1. Validate File Extension
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
+    if (!ALLOWED_EXTENSIONS.includes(fileExt)) {
+      setUploadError(
+        isAr 
+          ? `صيغة الملف (.${fileExt}) غير مقبولة. الصيغ المسموحة هي: PDF, DOC, DOCX, JPG, JPEG, PNG`
+          : `File format (.${fileExt}) is not supported. Allowed formats: PDF, DOC, DOCX, JPG, JPEG, PNG`
+      );
+      return false;
+    }
+
+    // 2. Validate File Size (Maximum 5MB)
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      setUploadError(
+        isAr
+          ? `حجم الملف (${sizeMB} ميغابايت) يتجاوز الحد الأقصى المسموح (5 ميغابايت). يرجى ضغط أو تقليل حجم الملف واختيار ملف أقل من 5 ميغا.`
+          : `File size (${sizeMB} MB) exceeds the maximum allowed limit of 5 MB. Please select a file under 5 MB.`
+      );
+      return false;
+    }
+
+    // 3. Read File as Data URL for instant preview/download and upload
     setUploadingDocId(docId);
-    setTimeout(() => {
-      const demoNames: Record<string, string> = {
-        'doc-pass': 'Passport_Scan_Verified.pdf',
-        'doc-cert': 'Attested_HighSchool_Grades.pdf',
-        'doc-lang': 'IELTS_Academic_6.5_Certificate.pdf',
-        'doc-fin': 'Bank_Financial_Guarantee.pdf',
-      };
-      const name = demoNames[docId] || 'Document_Verified.pdf';
-      onUpdateDocument(docId, name);
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      const fileUrl = e.target?.result as string;
+      const formattedSize = file.size >= 1024 * 1024
+        ? `${(file.size / (1024 * 1024)).toFixed(2)} MB`
+        : `${Math.round(file.size / 1024)} KB`;
+
+      onUpdateDocument(docId, file.name, {
+        fileSize: formattedSize,
+        fileUrl,
+        docType: meta?.docType,
+        nameAr: meta?.nameAr,
+        nameEn: meta?.nameEn,
+      });
+
       setUploadingDocId(null);
-    }, 1000);
+      setUploadSuccess(
+        isAr 
+          ? `تم رفع الملف "${file.name}" بنجاح (${formattedSize}) وجاري التدقيق الأكاديمي!`
+          : `File "${file.name}" (${formattedSize}) uploaded successfully!`
+      );
+      setTimeout(() => setUploadSuccess(null), 4000);
+    };
+
+    reader.onerror = () => {
+      setUploadingDocId(null);
+      setUploadError(isAr ? 'حدث خطأ أثناء قراءة الملف، يرجى المحاولة مجدداً' : 'Error reading file, please try again');
+    };
+
+    reader.readAsDataURL(file);
+    return true;
+  };
+
+  const handleDeleteDoc = (docId: string, docName: string) => {
+    if (window.confirm(isAr ? `هل تريد بالتأكيد إزالة ملف "${docName}"؟` : `Are you sure you want to remove "${docName}"?`)) {
+      if (onDeleteDocument) {
+        onDeleteDocument(docId);
+      } else {
+        onUpdateDocument(docId, '', { fileSize: undefined, fileUrl: undefined });
+      }
+      setUploadSuccess(isAr ? 'تم حذف الملف بنجاح، يمكنك رفع ملف جديد الآن.' : 'File removed. You can upload a new file now.');
+      setTimeout(() => setUploadSuccess(null), 3500);
+    }
+  };
+
+  const handleDownloadOrView = (doc: DocumentItem) => {
+    if (doc.file_url && doc.file_url.startsWith('data:')) {
+      const link = document.createElement('a');
+      link.href = doc.file_url;
+      link.download = doc.fileName || `${doc.nameEn || 'document'}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      setPreviewDoc(doc);
+    }
+  };
+
+  const handleCreateCustomDocSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDocFile) {
+      setUploadError(isAr ? 'يرجى اختيار الملف المراد رفعه (بحد أقصى 5 ميغا)' : 'Please select a file to upload (max 5MB)');
+      return;
+    }
+    if (!newDocNameAr.trim()) {
+      setUploadError(isAr ? 'يرجى كتابة اسم أو وصف الوثيقة' : 'Please provide document title');
+      return;
+    }
+
+    setIsSubmittingNewDoc(true);
+    const customDocId = `doc-custom-${Date.now()}`;
+    const ok = validateAndUploadFile(customDocId, newDocFile, {
+      nameAr: newDocNameAr.trim(),
+      nameEn: newDocNameEn.trim() || newDocNameAr.trim(),
+      docType: newDocCategory,
+    });
+
+    setIsSubmittingNewDoc(false);
+    if (ok !== false) {
+      setIsAddDocModalOpen(false);
+      setNewDocNameAr('');
+      setNewDocNameEn('');
+      setNewDocCategory('other');
+      setNewDocFile(null);
+    }
   };
 
   const copyApplicationNumber = () => {
@@ -515,35 +656,147 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           <div className={`lg:col-span-7 rounded-3xl p-6 shadow-xl space-y-6 text-start border ${
             isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
           }`}>
-            <div className="flex items-center justify-between border-b border-slate-800/40 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/40 pb-4">
               <div>
                 <h3 className="text-sm sm:text-base font-black flex items-center gap-2">
                   <FileText className="w-5 h-5 text-amber-500" />
                   <span>{isAr ? 'خزنة وثائق القبول والشهادات المعتمدة' : 'Official Academic Document Vault'}</span>
                 </h3>
                 <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {isAr ? 'قم برفع الشهادات الرسمية أو كشف الدرجات لتسريع استخراج القبول والفيزا' : 'Secure upload for transcripts and passport scan'}
+                  {isAr 
+                    ? 'ارفع شهاداتك وأوراقك بصيغ (PDF, DOC, DOCX, JPG, PNG) بحجم أقصى 5 ميغابايت لكل ملف'
+                    : 'Upload your documents (PDF, DOC, DOCX, JPG, PNG) up to 5MB per file'}
                 </p>
               </div>
-              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500">
-                {isAr ? 'تشفير آمن 256-bit' : 'Encrypted'}
-              </span>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddDocModalOpen(true)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{isAr ? 'إضافة وثيقة أخرى' : 'Add Document'}</span>
+                </button>
+                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 hidden sm:inline-block">
+                  {isAr ? 'مشفر 256-bit' : 'Encrypted'}
+                </span>
+              </div>
             </div>
 
+            {/* Upload Specs and Guidance Notice */}
+            <div className={`p-3.5 rounded-2xl border text-xs flex items-start gap-3 ${
+              isDark ? 'bg-slate-950/70 border-slate-800 text-slate-300' : 'bg-amber-50/50 border-amber-200 text-slate-700'
+            }`}>
+              <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <div className="font-bold text-amber-500">
+                  {isAr ? 'شروط ومعايير الملفات المقبولة للجامعات:' : 'Accepted Document Standards & Criteria:'}
+                </div>
+                <div className="text-[11px] leading-relaxed opacity-90">
+                  {isAr ? (
+                    <span>
+                      • الصيغ المدعومة: <strong className="text-amber-400 font-mono">PDF, DOC, DOCX, JPG, JPEG, PNG</strong>
+                      <br />
+                      • الحد الأقصى لحجم الملف الواحد: <strong className="text-amber-400 font-mono">5 ميغابايت (5MB)</strong>
+                      <br />
+                      • يمكنك سحب وإفلات الملف مباشرة على الخانة أو النقر على "رفع الملف".
+                    </span>
+                  ) : (
+                    <span>
+                      • Supported formats: <strong className="text-amber-400 font-mono">PDF, DOC, DOCX, JPG, JPEG, PNG</strong>
+                      <br />
+                      • Maximum size per file: <strong className="text-amber-400 font-mono">5 Megabytes (5MB)</strong>
+                      <br />
+                      • Drag & drop any file directly onto the card or click "Upload File".
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Error Message Banner */}
+            {uploadError && (
+              <div className="p-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs flex items-center justify-between gap-3 animate-in fade-in duration-200">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>{uploadError}</span>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setUploadError(null)} 
+                  className="p-1 hover:bg-rose-500/20 rounded-lg text-rose-300 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Success Message Banner */}
+            {uploadSuccess && (
+              <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs flex items-center justify-between gap-3 animate-in fade-in duration-200">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>{uploadSuccess}</span>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setUploadSuccess(null)} 
+                  className="p-1 hover:bg-emerald-500/20 rounded-lg text-emerald-300 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Documents List */}
             <div className="space-y-3">
               {documents.map((doc) => {
-                const isUploaded = doc.status === 'uploaded' || doc.status === 'verified';
+                const isUploaded = (doc.status === 'uploaded' || doc.status === 'verified') && !!doc.fileName;
                 const isUploading = uploadingDocId === doc.id;
+                const isDragOver = dragOverDocId === doc.id;
 
                 return (
                   <div
                     key={doc.id}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragOverDocId(doc.id);
+                    }}
+                    onDragLeave={() => setDragOverDocId(null)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOverDocId(null);
+                      const files = e.dataTransfer.files;
+                      if (files && files.length > 0) {
+                        validateAndUploadFile(doc.id, files[0]);
+                      }
+                    }}
                     className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                      isDark ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                      isDragOver
+                        ? 'border-amber-500 bg-amber-500/10 ring-2 ring-amber-400/30'
+                        : isDark
+                        ? 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                        : 'bg-slate-50 border-slate-200 hover:border-slate-300'
                     }`}
                   >
+                    {/* Hidden Native File Input */}
+                    <input
+                      type="file"
+                      id={`file-input-${doc.id}`}
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/webp"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          validateAndUploadFile(doc.id, file);
+                        }
+                        e.target.value = '';
+                      }}
+                      className="hidden"
+                    />
+
                     <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                      <div className={`w-10 h-10 rounded-xl shrink-0 flex items-center justify-center ${
                         doc.status === 'verified'
                           ? 'bg-emerald-500/20 text-emerald-400'
                           : isUploaded
@@ -551,26 +804,50 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                           : 'bg-slate-800 text-slate-400'
                       }`}>
                         {doc.status === 'verified' ? (
-                          <FileCheck className="w-5 h-5" />
+                          <FileCheck2 className="w-5 h-5 text-emerald-400" />
+                        ) : isUploaded ? (
+                          <FileCheck className="w-5 h-5 text-blue-400" />
                         ) : (
                           <FileText className="w-5 h-5" />
                         )}
                       </div>
 
-                      <div className="space-y-0.5">
-                        <div className="text-xs font-bold flex items-center gap-1.5">
+                      <div className="space-y-1">
+                        <div className="text-xs font-bold flex items-center gap-1.5 flex-wrap">
                           <span>{isAr ? doc.nameAr : doc.nameEn}</span>
                           {doc.required && (
-                            <span className="text-[10px] text-amber-500 font-semibold">*</span>
+                            <span className="text-[10px] text-amber-500 font-semibold">
+                              ({isAr ? 'إلزامي' : 'Mandatory'})
+                            </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-slate-400 font-mono">
-                          {doc.fileName ? doc.fileName : (isAr ? 'لم يتم الرفع بعد' : 'Not uploaded')}
+
+                        <div className="text-[11px] font-mono flex items-center gap-2 flex-wrap">
+                          {isUploaded ? (
+                            <>
+                              <span className="text-emerald-400 font-semibold">{doc.fileName}</span>
+                              {doc.fileSize && (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-200 text-slate-700'}`}>
+                                  {doc.fileSize}
+                                </span>
+                              )}
+                              {doc.uploadedAt && (
+                                <span className="text-[10px] text-slate-400">
+                                  {doc.uploadedAt}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-slate-400">
+                              {isAr ? 'لم يتم الرفع بعد (الحد الأقصى 5MB)' : 'Not uploaded yet (Max 5MB)'}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    {/* Action Controls */}
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
                         doc.status === 'verified'
                           ? 'bg-emerald-500/15 text-emerald-400'
@@ -578,25 +855,72 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                           ? 'bg-blue-500/15 text-blue-400'
                           : 'bg-amber-500/15 text-amber-400'
                       }`}>
-                        {doc.status === 'verified' ? (isAr ? 'معتمد رسمياً' : 'Verified') : isUploaded ? (isAr ? 'تم الرفع' : 'Uploaded') : (isAr ? 'مطلوب' : 'Required')}
+                        {doc.status === 'verified' 
+                          ? (isAr ? 'معتمد رسمياً' : 'Verified') 
+                          : isUploaded 
+                          ? (isAr ? 'تم الرفع' : 'Uploaded') 
+                          : (isAr ? 'مطلوب الرفع' : 'Required')}
                       </span>
 
-                      <button
-                        onClick={() => handleSimulatedFileUpload(doc.id)}
-                        disabled={isUploading}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
-                          isUploaded
-                            ? isDark ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                            : 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow'
-                        }`}
-                      >
-                        {isUploading ? (
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <UploadCloud className="w-3.5 h-3.5" />
-                        )}
-                        <span>{isUploaded ? (isAr ? 'تحديث' : 'Update') : (isAr ? 'رفع الآن' : 'Upload')}</span>
-                      </button>
+                      {/* If Uploaded: Preview/Download, Replace, Delete */}
+                      {isUploaded ? (
+                        <div className="flex items-center gap-1.5">
+                          {/* Preview / Download */}
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadOrView(doc)}
+                            title={isAr ? 'معاينة / تنزيل الملف' : 'Preview / Download'}
+                            className={`p-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                              isDark ? 'bg-slate-800 text-slate-200 hover:bg-slate-700' : 'bg-slate-200 text-slate-800 hover:bg-slate-300'
+                            }`}
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Replace File Button */}
+                          <label
+                            htmlFor={`file-input-${doc.id}`}
+                            title={isAr ? 'استبدال الملف الحالي' : 'Replace file'}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
+                              isDark ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                            }`}
+                          >
+                            {isUploading ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <UploadCloud className="w-3.5 h-3.5" />
+                            )}
+                            <span>{isAr ? 'استبدال' : 'Replace'}</span>
+                          </label>
+
+                          {/* Delete File Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDoc(doc.id, doc.fileName || doc.nameAr)}
+                            title={isAr ? 'حذف الملف' : 'Delete file'}
+                            className="p-2 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-500/20 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        /* If Pending: Upload Button */
+                        <label
+                          htmlFor={`file-input-${doc.id}`}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all ${
+                            isUploading
+                              ? 'bg-amber-500/50 cursor-not-allowed text-slate-900'
+                              : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md hover:scale-[1.02]'
+                          }`}
+                        >
+                          {isUploading ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <FileUp className="w-3.5 h-3.5" />
+                          )}
+                          <span>{isUploading ? (isAr ? 'جاري الرفع...' : 'Uploading...') : (isAr ? 'رفع الملف' : 'Upload File')}</span>
+                        </label>
+                      )}
                     </div>
                   </div>
                 );
@@ -608,13 +932,14 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               <div className="space-y-0.5">
                 <div className="text-xs font-black text-amber-500 flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4" />
-                  <span>{isAr ? 'عرض القبول الجامعي الرسمي (Offer Letter):' : 'Official University Offer Letter:'}</span>
+                  <span>{isAr ? 'عرض القبول الجامعي المشروط (Offer Letter):' : 'Official University Offer Letter:'}</span>
                 </div>
                 <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                  {isAr ? 'تم إصدار القبول المشروط بدون رسوم، يمكنك تحميل النسخة المعتمدة.' : 'Conditional admission issued free of charge.'}
+                  {isAr ? 'تم استخراج القبول المشروط بدون رسوم، يمكنك تحميل النسخة المعتمدة.' : 'Conditional admission issued free of charge.'}
                 </p>
               </div>
               <button
+                type="button"
                 onClick={() => {
                   alert(isAr ? 'جاري تحميل ملف القبول الأكاديمي المعتمد من عمادة الجامعة...' : 'Downloading authenticated university acceptance letter...');
                 }}
@@ -817,6 +1142,246 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         </div>
 
       </div>
+
+      {/* MODAL: ADD EXTRA DOCUMENT */}
+      {isAddDocModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className={`relative w-full max-w-lg rounded-3xl p-6 sm:p-8 border shadow-2xl space-y-6 text-start ${
+            isDark ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+          }`}>
+            <div className="flex items-center justify-between border-b border-slate-700/40 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-500 flex items-center justify-center">
+                  <FileUp className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black">
+                    {isAr ? 'رفع وثيقة أو شهادة إضافية' : 'Upload Additional Document'}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {isAr ? 'صيغ (PDF, DOC, DOCX, JPG, PNG) - حد أقصى 5 ميغابايت' : 'PDF, DOC, DOCX, JPG, PNG - Max 5MB'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddDocModalOpen(false);
+                  setNewDocFile(null);
+                  setNewDocNameAr('');
+                }}
+                className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCustomDocSubmit} className="space-y-4">
+              {/* Document Category */}
+              <div>
+                <label className="block text-xs font-bold mb-1.5 text-slate-300">
+                  {isAr ? 'نوع الوثيقة' : 'Document Type'}
+                </label>
+                <select
+                  value={newDocCategory}
+                  onChange={(e) => setNewDocCategory(e.target.value)}
+                  className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none focus:border-amber-500 ${
+                    isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                  }`}
+                >
+                  <option value="recommendation">{isAr ? 'خطاب توصية أكاديمية (Recommendation Letter)' : 'Academic Recommendation'}</option>
+                  <option value="transcript">{isAr ? 'كشف درجات إضافي / شهادة دبلوم' : 'Additional Transcript / Diploma'}</option>
+                  <option value="sop">{isAr ? 'السيرة الذاتية أو خطاب الدافع (CV / SOP)' : 'Resume / CV / SOP'}</option>
+                  <option value="financial">{isAr ? 'إفادة ابتعاث أو ضمان مالي جديد' : 'Financial Guarantee / Sponsorship'}</option>
+                  <option value="other">{isAr ? 'شهادة دورة / خبرة عملية / مستند آخر' : 'Experience / Certificate / Other'}</option>
+                </select>
+              </div>
+
+              {/* Document Title */}
+              <div>
+                <label className="block text-xs font-bold mb-1.5 text-slate-300">
+                  {isAr ? 'اسم أو وصف المستند *' : 'Document Name / Description *'}
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder={isAr ? 'مثال: خطاب التوصية من الدكتور أحمد، السيرة الذاتية...' : 'e.g., Recommendation Letter from Dean, Resume...'}
+                  value={newDocNameAr}
+                  onChange={(e) => {
+                    setNewDocNameAr(e.target.value);
+                    if (!newDocNameEn) setNewDocNameEn(e.target.value);
+                  }}
+                  className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none focus:border-amber-500 ${
+                    isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                  }`}
+                />
+              </div>
+
+              {/* File Dropzone / Selector */}
+              <div>
+                <label className="block text-xs font-bold mb-1.5 text-slate-300">
+                  {isAr ? 'اختيار الملف (بحد أقصى 5MB) *' : 'Choose File (Max 5MB) *'}
+                </label>
+                <div 
+                  className={`border-2 border-dashed rounded-2xl p-5 text-center transition-all ${
+                    newDocFile
+                      ? 'border-emerald-500 bg-emerald-500/10'
+                      : isDark ? 'border-slate-700 bg-slate-950/40 hover:border-amber-500' : 'border-slate-300 bg-slate-50 hover:border-amber-500'
+                  }`}
+                >
+                  <input
+                    type="file"
+                    id="new-custom-doc-input"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/webp"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        if (f.size > MAX_FILE_SIZE_BYTES) {
+                          setUploadError(isAr ? 'حجم الملف يتجاوز 5 ميغابايت' : 'File size exceeds 5MB');
+                          return;
+                        }
+                        setNewDocFile(f);
+                        if (!newDocNameAr) {
+                          setNewDocNameAr(f.name.replace(/\.[^/.]+$/, ''));
+                        }
+                      }
+                    }}
+                    className="hidden"
+                  />
+                  <label htmlFor="new-custom-doc-input" className="cursor-pointer block space-y-2">
+                    <UploadCloud className="w-8 h-8 text-amber-500 mx-auto" />
+                    {newDocFile ? (
+                      <div className="space-y-0.5">
+                        <div className="text-xs font-bold text-emerald-400">{newDocFile.name}</div>
+                        <div className="text-[11px] text-slate-400 font-mono">
+                          {(newDocFile.size / (1024 * 1024)).toFixed(2)} MB
+                        </div>
+                        <span className="text-[10px] text-amber-400 underline">{isAr ? 'تغيير الملف' : 'Change file'}</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="text-xs font-bold text-slate-300">
+                          {isAr ? 'انقر لاختيار الملف من جهازك أو اسحبه إلى هنا' : 'Click to select file or drag & drop'}
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                          PDF, DOC, DOCX, JPG, PNG (Max 5MB)
+                        </div>
+                      </div>
+                    )}
+                  </label>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsAddDocModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white cursor-pointer"
+                >
+                  {isAr ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newDocFile || isSubmittingNewDoc}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 cursor-pointer transition-all ${
+                    !newDocFile || isSubmittingNewDoc
+                      ? 'bg-amber-500/50 text-slate-900 cursor-not-allowed'
+                      : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg'
+                  }`}
+                >
+                  {isSubmittingNewDoc && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isAr ? 'تأكيد ورفع الوثيقة' : 'Confirm & Upload'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: DOCUMENT PREVIEW */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className={`relative w-full max-w-lg rounded-3xl p-6 sm:p-8 border shadow-2xl space-y-5 text-start ${
+            isDark ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+          }`}>
+            <div className="flex items-center justify-between border-b border-slate-700/40 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
+                  <FileCheck2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black">
+                    {isAr ? previewDoc.nameAr : previewDoc.nameEn}
+                  </h3>
+                  <div className="text-[11px] text-slate-400 font-mono">
+                    {previewDoc.fileName || (isAr ? 'وثيقة مرفوعة' : 'Uploaded document')}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewDoc(null)}
+                className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="p-4 rounded-2xl bg-slate-950/50 border border-slate-800 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">{isAr ? 'حالة الاعتماد:' : 'Verification Status:'}</span>
+                  <span className="font-bold text-emerald-400">
+                    {previewDoc.status === 'verified' 
+                      ? (isAr ? 'معتمد رسمياً للتقديم الجامعي' : 'Officially Verified') 
+                      : (isAr ? 'تم الرفع وقيد المراجعة الأكاديمية' : 'Uploaded - Under Counselor Review')}
+                  </span>
+                </div>
+                {previewDoc.fileSize && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">{isAr ? 'حجم الملف:' : 'File Size:'}</span>
+                    <span className="font-mono text-slate-200">{previewDoc.fileSize}</span>
+                  </div>
+                )}
+                {previewDoc.uploadedAt && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">{isAr ? 'تاريخ الرفع:' : 'Uploaded At:'}</span>
+                    <span className="font-mono text-slate-200">{previewDoc.uploadedAt}</span>
+                  </div>
+                )}
+              </div>
+
+              {previewDoc.file_url && previewDoc.file_url.startsWith('data:image') && (
+                <div className="rounded-2xl overflow-hidden border border-slate-800 max-h-60 flex items-center justify-center bg-black/40">
+                  <img src={previewDoc.file_url} alt={previewDoc.fileName} className="max-h-60 object-contain" />
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              {previewDoc.file_url ? (
+                <a
+                  href={previewDoc.file_url}
+                  download={previewDoc.fileName || 'document.pdf'}
+                  className="px-4 py-2 rounded-xl text-xs font-black bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center gap-1.5 shadow cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isAr ? 'تحميل الملف إلى جهازك' : 'Download File'}</span>
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setPreviewDoc(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-200 hover:bg-slate-700 cursor-pointer"
+                >
+                  {isAr ? 'إغلاق' : 'Close'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -19,18 +19,29 @@ const router = Router();
 router.get('/', async (req: Request, res: Response) => {
   try {
     if (isPostgresConnected) {
-      // الجديد: جلب من جدول الإعدادات الجديد
       const result = await pool.query('SELECT key, value_ar, value_en, value_numeric, category FROM settings');
       const settingsObj: Record<string, any> = {};
+      
       result.rows.forEach(row => {
-        settingsObj[row.key] = {
-          ar: row.value_ar,
-          en: row.value_en,
-          numeric: row.value_numeric,
-          category: row.category
-        };
+        // Flatten into standard key-values and also provide structured values
+        if (row.value_ar && row.value_en) {
+          settingsObj[`${row.key}_ar`] = row.value_ar;
+          settingsObj[`${row.key}_en`] = row.value_en;
+        } else if (row.value_ar) {
+          settingsObj[row.key] = row.value_ar;
+          settingsObj[`${row.key}_ar`] = row.value_ar;
+        } else if (row.value_en) {
+          settingsObj[row.key] = row.value_en;
+          settingsObj[`${row.key}_en`] = row.value_en;
+        } else if (row.value_numeric !== null) {
+          settingsObj[row.key] = row.value_numeric;
+        }
+
+        settingsObj[row.key] = settingsObj[row.key] || row.value_ar || row.value_en || '';
       });
-      return res.json({ success: true, source: 'postgres', data: settingsObj });
+
+      const merged = { ...inMemoryStore.settings, ...settingsObj };
+      return res.json({ success: true, source: 'postgres', data: merged });
     }
 
     // الرد من الذاكرة في حال عدم تشغيل بوستجريس
@@ -47,25 +58,41 @@ router.get('/', async (req: Request, res: Response) => {
  */
 router.put('/', async (req: Request, res: Response) => {
   try {
-    const updates = req.body; // { key: { ar: ..., en: ..., ... }, ... }
+    const updates = req.body;
     
     if (!updates || typeof updates !== 'object') {
       return res.status(400).json({ success: false, error: 'بيانات غير صالحة' });
     }
 
+    // Update in-memory store
+    inMemoryStore.settings = { ...inMemoryStore.settings, ...updates };
+
     // تحديث قاعدة بيانات PostgreSQL إذا كانت متصلة
     if (isPostgresConnected) {
-      for (const [k, v] of Object.entries(updates) as [string, any]) {
-        await pool.query(
-          `INSERT INTO settings (key, value_ar, value_en, value_numeric, category) 
-           VALUES ($1, $2, $3, $4, $5) 
-           ON CONFLICT (key) DO UPDATE SET 
-             value_ar = EXCLUDED.value_ar, 
-             value_en = EXCLUDED.value_en,
-             value_numeric = EXCLUDED.value_numeric,
-             category = EXCLUDED.category`,
-          [k, v.ar || null, v.en || null, v.numeric || null, v.category || null]
-        );
+      for (const [k, v] of Object.entries(updates)) {
+        if (v && typeof v === 'object' && ('ar' in v || 'en' in v)) {
+          const valObj = v as any;
+          await pool.query(
+            `INSERT INTO settings (key, value_ar, value_en, value_numeric, category) 
+             VALUES ($1, $2, $3, $4, $5) 
+             ON CONFLICT (key) DO UPDATE SET 
+               value_ar = EXCLUDED.value_ar, 
+               value_en = EXCLUDED.value_en,
+               value_numeric = EXCLUDED.value_numeric,
+               category = EXCLUDED.category`,
+            [k, valObj.ar || null, valObj.en || null, valObj.numeric || null, valObj.category || null]
+          );
+        } else {
+          const valStr = typeof v === 'string' ? v : JSON.stringify(v);
+          await pool.query(
+            `INSERT INTO settings (key, value_ar, value_en, category) 
+             VALUES ($1, $2, $3, 'general') 
+             ON CONFLICT (key) DO UPDATE SET 
+               value_ar = EXCLUDED.value_ar, 
+               value_en = EXCLUDED.value_en`,
+            [k, valStr, valStr]
+          );
+        }
       }
     }
 
@@ -73,6 +100,7 @@ router.put('/', async (req: Request, res: Response) => {
     return res.json({
       success: true,
       message: 'تم حفظ وتحديث الإعدادات بنجاح في قاعدة البيانات',
+      data: inMemoryStore.settings
     });
   } catch (error: any) {
     console.error('Error updating settings:', error.message);

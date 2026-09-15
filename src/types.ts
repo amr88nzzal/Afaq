@@ -58,10 +58,11 @@ export interface DocumentItem {
   id: string;
   nameAr: string;
   nameEn: string;
-  category: 'passport' | 'transcript' | 'english_test' | 'recommendation' | 'sop' | 'financial' | 'identity' | 'academic' | 'language' | 'financial_guarantee';
+  category: 'passport' | 'transcript' | 'english_test' | 'recommendation' | 'sop' | 'financial' | 'identity' | 'academic' | 'language' | 'financial_guarantee' | 'other' | string;
   required: boolean;
   status: 'pending' | 'uploaded' | 'verified' | 'action_needed' | 'missing' | 'rejected';
   fileName?: string;
+  fileSize?: string;
   uploadedAt?: string;
   rejectionReason?: string;
   feedback?: string;
@@ -235,17 +236,18 @@ export interface CustomerEntity {
 }
 
 export interface MeetingEntity {
-  id: number;
+  id?: number;
   customer_id?: number;
   staff_id?: number;
   customer_name: string;
   customer_email: string;
   customer_phone: string;
   destination_country?: string;
-  meeting_date: string;
+  topic?: string;
+  meeting_date?: string;
   meeting_time: string;
-  meeting_type: 'video' | 'phone' | 'in_office';
-  status: 'scheduled' | 'completed' | 'cancelled' | 'no_show';
+  meeting_type?: 'video' | 'phone' | 'in_office';
+  status?: 'scheduled' | 'completed' | 'cancelled' | 'no_show';
   meeting_link?: string;
   notes?: string;
   counselor_name?: string;

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Language, DestinationCountry, StudyLevel, Theme, CountryEntity } from '../types';
+import { Language, DestinationCountry, StudyLevel, Theme, CountryEntity, CMSParagraphEntity } from '../types';
+import { SiteSettings } from '../services/api';
 import { getCountryFlag } from '../utils/countryHelper';
 import { 
   GraduationCap, 
@@ -20,6 +21,8 @@ interface HeroSectionProps {
   onNavigateDestinations: (country?: DestinationCountry) => void;
   onOpenCounselorBooking: () => void;
   countries?: CountryEntity[];
+  settings?: SiteSettings;
+  cmsParagraphs?: CMSParagraphEntity[];
 }
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
@@ -29,10 +32,27 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   onNavigateDestinations,
   onOpenCounselorBooking,
   countries = [],
+  settings,
+  cmsParagraphs = [],
 }) => {
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
   const ArrowIcon = isAr ? ArrowLeft : ArrowRight;
+
+  // Find dynamic CMS paragraphs if available
+  const heroMainPara = cmsParagraphs.find(p => p.slug === 'hero_main' || p.slug === 'hero_title');
+  const heroSubPara = cmsParagraphs.find(p => p.slug === 'hero_sub' || p.slug === 'hero_description');
+  const whyUsPara = cmsParagraphs.find(p => p.slug === 'why_us' || p.slug === 'about_brief');
+
+  // Dynamic Headline from Database
+  const dynamicHeroTitle = isAr 
+    ? (heroMainPara?.text_ar || settings?.hero_title_ar || 'بوابتك الموثوقة لأعرق الجامعات العالمية والابتعاث')
+    : (heroMainPara?.text_en || settings?.hero_title_en || 'Your Fast-Track Gateway to Premier Global Universities');
+
+  // Dynamic Subtitle from Database
+  const dynamicHeroSubtitle = isAr
+    ? (heroSubPara?.text_ar || settings?.hero_subtitle_ar || 'نرافق طلاب الشرق الأوسط والخليج العربي خطوة بخطوة: تأمين القبولات غير المشروطة، معادلة الشهادات، استشارات المنح والابتعاث الحكومي، ومرافقة شاملة لإصدار التأشيرة الدراسية حتى وصولك لمقعدك الجامعي.')
+    : (heroSubPara?.text_en || settings?.hero_subtitle_en || 'Empowering GCC and Middle Eastern students with guaranteed conditional & unconditional university offers, visa assistance, and specialized government scholarship guidance for the UK, Australia, and New Zealand.');
 
   // Filter only active countries
   const activeCountries = (countries && countries.length > 0)
@@ -121,38 +141,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             <h1 className={`text-3xl sm:text-4xl lg:text-5xl font-black leading-tight tracking-tight ${
               isDark ? 'text-white' : 'text-slate-900'
             }`}>
-              {isAr ? (
-                <>
-                  بوابتك الموثوقة لأعرق <br />
-                  <span className={isDark 
-                    ? "bg-gradient-to-r from-amber-300 via-amber-400 to-amber-200 bg-clip-text text-transparent"
-                    : "bg-gradient-to-r from-amber-600 via-amber-700 to-amber-600 bg-clip-text text-transparent"
-                  }>
-                    الجامعات العالمية والابتعاث
-                  </span>
-                </>
-              ) : (
-                <>
-                  Your Fast-Track Gateway to <br />
-                  <span className={isDark 
-                    ? "bg-gradient-to-r from-amber-300 via-amber-400 to-amber-200 bg-clip-text text-transparent"
-                    : "bg-gradient-to-r from-amber-600 via-amber-700 to-amber-600 bg-clip-text text-transparent"
-                  }>
-                    Premier Global Universities
-                  </span>
-                </>
-              )}
+              {dynamicHeroTitle}
             </h1>
 
             {/* Subtext */}
             <p className={`text-base sm:text-lg max-w-2xl leading-relaxed ${
               isDark ? 'text-slate-300' : 'text-slate-700'
             }`}>
-              {isAr ? (
-                'نرافق طلاب الشرق الأوسط والخليج العربي خطوة بخطوة: تأمين القبولات غير المشروطة، معادلة الشهادات، استشارات المنح والابتعاث الحكومي، ومرافقة شاملة لإصدار التأشيرة الدراسية حتى وصولك لمقعدك الجامعي.'
-              ) : (
-                'Empowering GCC and Middle Eastern students with guaranteed conditional & unconditional university offers, visa assistance, and specialized government scholarship guidance for the UK, Australia, and New Zealand.'
-              )}
+              {dynamicHeroSubtitle}
             </p>
 
             {/* Key Value Points */}

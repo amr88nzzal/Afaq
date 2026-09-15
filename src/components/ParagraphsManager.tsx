@@ -6,9 +6,10 @@ import { FileText, Edit3, Check, Loader2, RefreshCw } from 'lucide-react';
 interface ParagraphsManagerProps {
   lang: Language;
   theme: Theme;
+  onCMSUpdated?: () => void;
 }
 
-export const ParagraphsManager: React.FC<ParagraphsManagerProps> = ({ lang, theme }) => {
+export const ParagraphsManager: React.FC<ParagraphsManagerProps> = ({ lang, theme, onCMSUpdated }) => {
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
 
@@ -35,6 +36,7 @@ export const ParagraphsManager: React.FC<ParagraphsManagerProps> = ({ lang, them
     setSavingSlug(p.slug);
     try {
       await updateCMSParagraphAPI(p.slug, p);
+      if (onCMSUpdated) onCMSUpdated();
       setToast(isAr ? `تم حفظ نص [${p.slug}] بنجاح في قاعدة البيانات` : `Saved [${p.slug}] to DB`);
     } finally {
       setSavingSlug(null);

@@ -348,7 +348,7 @@ router.patch('/:id/documents/:docId', async (req: Request, res: Response) => {
 
     if (isPostgresConnected) {
       const result = await pool.query(
-        'UPDATE documents SET status = $1, feedback = $2 WHERE id = $3 AND application_id = $4 RETURNING *',
+        'UPDATE documents SET status = $1, feedback = $2 WHERE id::text = $3 AND application_id IN (SELECT id FROM applications WHERE id::text = $4 OR application_number = $4) RETURNING *',
         [status, feedback || null, docId, id]
       );
       if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'المستند غير موجود' });
@@ -356,6 +356,125 @@ router.patch('/:id/documents/:docId', async (req: Request, res: Response) => {
     }
 
     return res.json({ success: true, message: 'تم تحديث حالة المستند بنجاح' });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * رفع مستند جديد أو تحديث ملف مستند موجود من قبل الطالب
+ * POST /api/applications/:id/documents
+ */
+router.post('/:id/documents', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { docId, docType, nameAr, nameEn, fileName, fileSize, fileUrl } = req.body;
+
+    if (!fileName) {
+      return res.status(400).json({ success: false, error: 'اسم الملف مطلوب للرفع' });
+    }
+
+    if (isPostgresConnected) {
+      // Find numeric application id
+      const appRes = await pool.query('SELECT id FROM applications WHERE id::text = $1 OR application_number = $1 LIMIT 1', [id]);
+      if (appRes.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'الطلب غير موجود في قاعدة البيانات' });
+      }
+      const appId = appRes.rows[0].id;
+
+      // If updating an existing doc
+      if (docId && !isNaN(Number(docId))) {
+        const updateRes = await pool.query(
+          'UPDATE documents SET file_url = $1, status = $2, uploaded_at = NOW() WHERE id = $3 AND application_id = $4 RETURNING *',
+          [fileUrl || fileName, 'uploaded', Number(docId), appId]
+        );
+        if (updateRes.rows.length > 0) {
+          return res.json({ success: true, message: 'تم رفع المستند بنجاح في قاعدة البيانات', data: updateRes.rows[0] });
+        }
+      }
+
+      // Check if document with same category exists for this application
+      if (docType) {
+        const existingCategoryDoc = await pool.query(
+          'SELECT id FROM documents WHERE application_id = $1 AND doc_type = $2 LIMIT 1',
+          [appId, docType]
+        );
+        if (existingCategoryDoc.rows.length > 0) {
+          const updateRes = await pool.query(
+            'UPDATE documents SET file_url = $1, status = $2, name_ar = COALESCE($3, name_ar), uploaded_at = NOW() WHERE id = $4 RETURNING *',
+            [fileUrl || fileName, 'uploaded', nameAr || null, existingCategoryDoc.rows[0].id]
+          );
+          return res.json({ success: true, message: 'تم تحديث المستند بنجاح', data: updateRes.rows[0] });
+        }
+      }
+
+      // Insert new document record
+      const insertRes = await pool.query(
+        'INSERT INTO documents (application_id, doc_type, name_ar, name_en, status, file_url, uploaded_at) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
+        [appId, docType || 'other', nameAr || fileName, nameEn || fileName, 'uploaded', fileUrl || fileName]
+      );
+      return res.status(201).json({ success: true, message: 'تم رفع المستند الجديد بنجاح في قاعدة البيانات', data: insertRes.rows[0] });
+    }
+
+    // In-memory fallback
+    const app = inMemoryStore.applications.find(a => a.id.toString() === id || a.application_number === id);
+    if (!app) return res.status(404).json({ success: false, error: 'الطلب غير موجود' });
+
+    if (!app.documents) app.documents = [];
+    const existingIndex = app.documents.findIndex((d: any) => 
+      (docId && d.id?.toString() === docId.toString()) || 
+      (docType && (d.doc_type === docType || d.category === docType))
+    );
+
+    const docObj = {
+      id: docId || `doc-${Date.now()}`,
+      doc_type: docType || 'other',
+      category: docType || 'other',
+      name_ar: nameAr || fileName,
+      name_en: nameEn || fileName,
+      nameAr: nameAr || fileName,
+      nameEn: nameEn || fileName,
+      status: 'uploaded',
+      fileName,
+      fileSize: fileSize || '1.2 MB',
+      file_url: fileUrl || fileName,
+      uploadedAt: new Date().toISOString(),
+    };
+
+    if (existingIndex >= 0) {
+      app.documents[existingIndex] = { ...app.documents[existingIndex], ...docObj };
+    } else {
+      app.documents.push(docObj as any);
+    }
+
+    return res.json({ success: true, message: 'تم رفع المستند بنجاح', data: docObj });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * حذف مستند من الطلب
+ * DELETE /api/applications/:id/documents/:docId
+ */
+router.delete('/:id/documents/:docId', async (req: Request, res: Response) => {
+  try {
+    const { id, docId } = req.params;
+
+    if (isPostgresConnected) {
+      await pool.query(
+        'DELETE FROM documents WHERE id::text = $1 AND application_id IN (SELECT id FROM applications WHERE id::text = $2 OR application_number = $2)',
+        [docId, id]
+      );
+      return res.json({ success: true, message: 'تم حذف المستند بنجاح من قاعدة البيانات' });
+    }
+
+    const app = inMemoryStore.applications.find(a => a.id.toString() === id || a.application_number === id);
+    if (app && app.documents) {
+      app.documents = app.documents.filter((d: any) => d.id?.toString() !== docId.toString());
+    }
+
+    return res.json({ success: true, message: 'تم حذف المستند بنجاح' });
   } catch (error: any) {
     return res.status(500).json({ success: false, error: error.message });
   }

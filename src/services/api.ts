@@ -267,6 +267,23 @@ export async function deleteMajorAPI(id: number): Promise<boolean> {
 // 5. إدارة الموظفين والمستشارين (Staff / Users)
 // ==========================================
 
+export async function loginStaffAPI(username: string, password: string): Promise<{ success: boolean; user?: StaffUserEntity; error?: string; message?: string }> {
+  try {
+    const res = await fetch('/api/users/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      return { success: false, error: json.error || 'فشل تسجيل الدخول' };
+    }
+    return { success: true, user: json.user, message: json.message };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'حدث خطأ في الاتصال بالخادم' };
+  }
+}
+
 export async function fetchStaffUsersAPI(): Promise<StaffUserEntity[]> {
   try {
     const res = await fetch('/api/users');
@@ -467,6 +484,44 @@ export async function updateDocumentStatusAPI(appId: string, docId: number | str
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status, feedback }),
+    });
+    const json = await res.json();
+    return json.success === true;
+  } catch {
+    return false;
+  }
+}
+
+export async function uploadStudentDocumentAPI(
+  appId: string,
+  docData: {
+    docId?: string | number;
+    docType: string;
+    nameAr: string;
+    nameEn: string;
+    fileName: string;
+    fileSize?: string;
+    fileUrl?: string;
+  }
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const res = await fetch(`/api/applications/${appId}/documents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(docData),
+    });
+    const json = await res.json();
+    if (!res.ok) return { success: false, error: json.error || 'فشل رفع المستند' };
+    return { success: true, data: json.data };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'تعذر رفع المستند إلى الخادم' };
+  }
+}
+
+export async function deleteStudentDocumentAPI(appId: string, docId: string | number): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/applications/${appId}/documents/${docId}`, {
+      method: 'DELETE',
     });
     const json = await res.json();
     return json.success === true;

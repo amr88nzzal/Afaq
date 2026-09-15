@@ -13,8 +13,8 @@ import { ApplicationModal } from './components/ApplicationModal';
 import { CounselorBookingModal } from './components/CounselorBookingModal';
 import { NotificationToast, NotificationPayload } from './components/NotificationToast';
 import { MOCK_APPLICATIONS, TESTIMONIALS } from './data/mockData';
-import { DestinationCountry, Language, University, Theme, Application, CountryEntity } from './types';
-import { fetchCountriesAPI } from './services/api';
+import { DestinationCountry, Language, University, Theme, Application, CountryEntity, CMSParagraphEntity, DocumentItem } from './types';
+import { fetchCountriesAPI, getSiteSettings, fetchCMSParagraphsAPI, SiteSettings, uploadStudentDocumentAPI, deleteStudentDocumentAPI } from './services/api';
 import { getCountryFlag, getCountryFallbackImage } from './utils/countryHelper';
 import { 
   Award, 
@@ -42,6 +42,8 @@ export default function App() {
   const [selectedDestinationCountry, setSelectedDestinationCountry] = useState<DestinationCountry>('uk');
   const [selectedUniversity, setSelectedUniversity] = useState<University | undefined>(undefined);
   const [countries, setCountries] = useState<CountryEntity[]>([]);
+  const [settings, setSettings] = useState<SiteSettings | undefined>(undefined);
+  const [cmsParagraphs, setCmsParagraphs] = useState<CMSParagraphEntity[]>([]);
 
   const refreshCountries = async () => {
     try {
@@ -53,9 +55,29 @@ export default function App() {
     }
   };
 
-  // Load countries from database API on mount
+  const refreshSettings = async () => {
+    try {
+      const s = await getSiteSettings();
+      if (s) setSettings(s);
+    } catch (err) {
+      console.error('Failed to load site settings in App', err);
+    }
+  };
+
+  const refreshCMS = async () => {
+    try {
+      const paras = await fetchCMSParagraphsAPI();
+      if (Array.isArray(paras)) setCmsParagraphs(paras);
+    } catch (err) {
+      console.error('Failed to load CMS paragraphs in App', err);
+    }
+  };
+
+  // Load countries, site settings, and CMS paragraphs from database API on mount
   useEffect(() => {
     refreshCountries();
+    refreshSettings();
+    refreshCMS();
   }, []);
 
   // Filter only active countries for public visitor views
@@ -102,7 +124,19 @@ export default function App() {
   const [activeStudentApp, setActiveStudentApp] = useState<Application | null>(() => {
     try {
       const saved = localStorage.getItem('afaq_active_app');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // If parsed contains legacy pre-filled documents where passport_mohammed.pdf was hardcoded, reset them to pending
+        if (parsed?.documents?.some((d: any) => d.fileName === 'passport_mohammed.pdf' || d.fileName === 'passport_scan.pdf')) {
+          const freshApp = {
+            ...parsed,
+            documents: MOCK_APPLICATIONS[0]?.documents || parsed.documents
+          };
+          localStorage.setItem('afaq_active_app', JSON.stringify(freshApp));
+          return freshApp;
+        }
+        return parsed;
+      }
     } catch (e) {}
     return MOCK_APPLICATIONS[0] || null;
   });
@@ -197,24 +231,106 @@ export default function App() {
     setIsApplicationModalOpen(true);
   };
 
-  const handleUpdateStudentDocument = (docId: string, fileName: string) => {
+  const handleUpdateStudentDocument = (
+    docId: string, 
+    fileName: string, 
+    extraData?: {
+      fileSize?: string;
+      fileUrl?: string;
+      docType?: string;
+      nameAr?: string;
+      nameEn?: string;
+    }
+  ) => {
+    setActiveStudentApp(prev => {
+      if (!prev) return null;
+      const currentDocs = prev.documents || [];
+      const docIndex = currentDocs.findIndex(d => d.id === docId);
+
+      let newDocs: DocumentItem[];
+      if (docIndex >= 0) {
+        newDocs = currentDocs.map(d => 
+          d.id === docId 
+            ? { 
+                ...d, 
+                fileName, 
+                fileSize: extraData?.fileSize || d.fileSize, 
+                file_url: extraData?.fileUrl || d.file_url,
+                status: fileName ? ('uploaded' as const) : ('pending' as const),
+                uploadedAt: new Date().toISOString().split('T')[0]
+              } 
+            : d
+        );
+      } else {
+        const newDoc: DocumentItem = {
+          id: docId,
+          nameAr: extraData?.nameAr || fileName,
+          nameEn: extraData?.nameEn || fileName,
+          category: (extraData?.docType as any) || 'other',
+          required: false,
+          status: 'uploaded',
+          fileName,
+          fileSize: extraData?.fileSize,
+          file_url: extraData?.fileUrl,
+          uploadedAt: new Date().toISOString().split('T')[0]
+        };
+        newDocs = [...currentDocs, newDoc];
+      }
+
+      const updated = {
+        ...prev,
+        documents: newDocs,
+      };
+      try {
+        localStorage.setItem('afaq_active_app', JSON.stringify(updated));
+      } catch (e) {}
+
+      // Background API sync
+      if (prev.id || prev.applicationNumber) {
+        const targetId = prev.applicationNumber || prev.id;
+        uploadStudentDocumentAPI(targetId, {
+          docId,
+          docType: extraData?.docType || 'other',
+          nameAr: extraData?.nameAr || fileName,
+          nameEn: extraData?.nameEn || fileName,
+          fileName,
+          fileSize: extraData?.fileSize,
+          fileUrl: extraData?.fileUrl,
+        }).catch(() => {});
+      }
+
+      return updated;
+    });
+
+    if (fileName) {
+      triggerNotification('whatsapp', 
+        isAr ? 'تم استلام وثيقتك بنجاح' : 'Document Received',
+        isAr ? `تم رفع ملفك (${fileName}) وجاري مراجعته من قبل المستشار المختص.` : `File ${fileName} uploaded and assigned for verification.`
+      );
+    }
+  };
+
+  const handleDeleteStudentDocument = (docId: string) => {
     setActiveStudentApp(prev => {
       if (!prev) return null;
       const currentDocs = prev.documents || [];
       const updated = {
         ...prev,
-        documents: currentDocs.map(d => d.id === docId ? { ...d, fileName, status: 'uploaded' as const } : d),
+        documents: currentDocs.map(d => 
+          d.id === docId 
+            ? { ...d, fileName: undefined, fileSize: undefined, file_url: undefined, status: 'pending' as const }
+            : d
+        ),
       };
       try {
         localStorage.setItem('afaq_active_app', JSON.stringify(updated));
       } catch (e) {}
+
+      if (prev.id || prev.applicationNumber) {
+        deleteStudentDocumentAPI(prev.applicationNumber || prev.id, docId).catch(() => {});
+      }
       return updated;
     });
-
-    triggerNotification('whatsapp', 
-      isAr ? 'تم استلام وثيقتك بنجاح' : 'Document Received',
-      isAr ? `تم رفع ملفك (${fileName}) وجاري مراجعته من قبل المستشار المختص.` : `File ${fileName} uploaded and assigned for verification.`
-    );
   };
 
   return (
@@ -226,6 +342,7 @@ export default function App() {
       <Navbar
         lang={lang}
         theme={theme}
+        settings={settings}
         onToggleTheme={handleToggleTheme}
         onToggleLang={handleToggleLang}
         activeView={activeView as any}
@@ -252,6 +369,8 @@ export default function App() {
               lang={lang}
               theme={theme}
               countries={activeCountries}
+              settings={settings}
+              cmsParagraphs={cmsParagraphs}
               onOpenApplication={handleOpenApplicationWithCountry}
               onNavigateDestinations={(country) => {
                 if (country) setSelectedDestinationCountry(country);
@@ -621,6 +740,7 @@ export default function App() {
             theme={theme}
             application={activeStudentApp}
             onUpdateDocument={handleUpdateStudentDocument}
+            onDeleteDocument={handleDeleteStudentDocument}
             onTriggerNotificationTest={(channel) => triggerNotification(channel)}
             onLoginSuccess={(app) => {
               setActiveStudentApp(app);
@@ -646,6 +766,8 @@ export default function App() {
             onToggleTheme={handleToggleTheme}
             onToggleLang={handleToggleLang}
             onCountriesUpdated={refreshCountries}
+            onSettingsUpdated={refreshSettings}
+            onCMSUpdated={refreshCMS}
             onReturnToPublicSite={() => {
               window.location.hash = '';
               setActiveView('home');
@@ -693,6 +815,7 @@ export default function App() {
       <Footer
         lang={lang}
         theme={theme}
+        settings={settings}
         selectedLogoId={selectedLogoId}
         onNavigate={(view) => {
           if (view === 'staff-crm') {

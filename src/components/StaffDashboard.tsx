@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { MOCK_APPLICATIONS, INITIAL_ADMIN_ALERTS } from '../data/mockData';
-import { Application, ApplicationStage, Language, Theme, AdminAlert } from '../types';
+import { Application, ApplicationStage, Language, Theme, AdminAlert, StaffUserEntity } from '../types';
 import { 
   fetchApplicationsAPI, 
   updateApplicationStatusAPI, 
   updateApplicationFullAPI,
   updatePortalPasswordAPI,
   sendCredentialsEmailAPI,
-  checkServerHealthAPI 
+  checkServerHealthAPI,
+  loginStaffAPI
 } from '../services/api';
 import { SettingsManager } from './SettingsManager';
 import { UniversitiesManager } from './UniversitiesManager';
@@ -52,7 +53,15 @@ import {
   KeyRound,
   RefreshCw,
   Building2,
-  Calendar
+  Calendar,
+  User,
+  Key,
+  Eye,
+  EyeOff,
+  Crown,
+  GraduationCap,
+  UserCheck,
+  BadgeCheck
 } from 'lucide-react';
 import { LogoRenderer } from './LogoRenderer';
 
@@ -66,6 +75,8 @@ interface StaffDashboardProps {
   onSendStudentAlert: (appId: string, channel: 'whatsapp' | 'telegram' | 'email', message: string) => void;
   incomingAdminAlerts?: AdminAlert[];
   onCountriesUpdated?: () => void;
+  onSettingsUpdated?: () => void;
+  onCMSUpdated?: () => void;
 }
 
 export const StaffDashboard: React.FC<StaffDashboardProps> = ({
@@ -78,14 +89,36 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   onSendStudentAlert,
   incomingAdminAlerts = [],
   onCountriesUpdated,
+  onSettingsUpdated,
+  onCMSUpdated,
 }) => {
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
 
-  // Admin authentication state (requires PIN on opening as requested)
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [adminPin, setAdminPin] = useState<string>('');
-  const [pinError, setPinError] = useState<boolean>(false);
+  // Current logged in staff user and auth state
+  const [currentUser, setCurrentUser] = useState<StaffUserEntity | null>(() => {
+    try {
+      const saved = sessionStorage.getItem('afaq_staff_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('afaq_admin_auth') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // Login form states
+  const [usernameInput, setUsernameInput] = useState<string>('');
+  const [passwordInput, setPasswordInput] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   // Admin Tab Navigation: 'crm' | 'universities' | 'countries' | 'users' | 'meetings' | 'cms' | 'settings' | 'docker'
   const [mainTab, setMainTab] = useState<'crm' | 'universities' | 'countries' | 'users' | 'meetings' | 'cms' | 'settings' | 'docker'>('crm');
@@ -137,24 +170,70 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
 
   const unreadAlertsCount = alerts.filter(a => !a.isRead).length;
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminPin === 'afaq2026' || adminPin === 'admin' || adminPin === '1234') {
-      setIsAuthenticated(true);
-      setPinError(false);
-      try {
-        sessionStorage.setItem('afaq_admin_auth', 'true');
-      } catch (e) {}
-    } else {
-      setPinError(true);
+    setLoginError(null);
+
+    const userVal = usernameInput.trim();
+    const passVal = passwordInput.trim();
+
+    if (!userVal || !passVal) {
+      setLoginError(isAr ? 'يرجى إدخال اسم المستخدم وكلمة المرور' : 'Please enter both username and password');
+      return;
     }
+
+    setIsLoggingIn(true);
+    try {
+      const res = await loginStaffAPI(userVal, passVal);
+      if (res.success && res.user) {
+        setCurrentUser(res.user);
+        setIsAuthenticated(true);
+        try {
+          sessionStorage.setItem('afaq_admin_auth', 'true');
+          sessionStorage.setItem('afaq_staff_user', JSON.stringify(res.user));
+        } catch {}
+      } else {
+        // Fallback check for demo master pin
+        if (passVal === 'afaq2026' || passVal === 'admin123') {
+          const fallbackUser: StaffUserEntity = {
+            id: 1,
+            name: userVal || (isAr ? 'د. فيصل الشمري' : 'Dr. Faisal Al-Shammari'),
+            email: userVal.includes('@') ? userVal : 'faisal@afaq-global.com',
+            role: 'admin',
+            is_active: true
+          };
+          setCurrentUser(fallbackUser);
+          setIsAuthenticated(true);
+          try {
+            sessionStorage.setItem('afaq_admin_auth', 'true');
+            sessionStorage.setItem('afaq_staff_user', JSON.stringify(fallbackUser));
+          } catch {}
+        } else {
+          setLoginError(res.error || (isAr ? 'اسم المستخدم أو كلمة المرور غير صحيحة' : 'Invalid username or password'));
+        }
+      }
+    } catch {
+      setLoginError(isAr ? 'تعذر التحقق من بيانات الدخول، تأكد من الاتصال بالخادم' : 'Failed to verify login credentials');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleQuickPersonaSelect = (email: string, pass: string) => {
+    setUsernameInput(email);
+    setPasswordInput(pass);
+    setLoginError(null);
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
+    setCurrentUser(null);
+    setUsernameInput('');
+    setPasswordInput('');
     try {
       sessionStorage.removeItem('afaq_admin_auth');
-    } catch (e) {}
+      sessionStorage.removeItem('afaq_staff_user');
+    } catch {}
   };
 
   const handleMarkAlertRead = (alertId: string) => {
@@ -289,66 +368,189 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
       <div className={`min-h-screen flex items-center justify-center p-4 transition-colors ${
         isDark ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-900'
       }`}>
-        <div className={`max-w-md w-full rounded-3xl p-8 border shadow-2xl space-y-6 text-center ${
+        <div className={`max-w-md w-full rounded-3xl p-8 border shadow-2xl space-y-6 ${
           isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
         }`}>
-          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-500">
-            <Lock className="w-8 h-8" />
-          </div>
+          <div className="text-center space-y-2">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-500 shadow-inner">
+              <ShieldCheck className="w-8 h-8" />
+            </div>
 
-          <div>
-            <div className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-1">
-              {isAr ? 'بوابة الإدارة والمشرفين (./admin)' : 'Staff & Admins Portal'}
+            <div className="text-xs font-bold text-amber-500 uppercase tracking-widest">
+              {isAr ? 'بوابة المشرفين والموظفين المعتمدة' : 'Staff & Admissions Portal'}
             </div>
             <h2 className="text-2xl font-black">
-              {isAr ? 'تسجيل دخول المشرفين المعتمدين' : 'Authorized Personnel Login'}
+              {isAr ? 'تسجيل الدخول للنظام' : 'Authorized Personnel Login'}
             </h2>
-            <p className="text-xs text-slate-400 mt-1">
-              {isAr ? 'لوحة تحكم إدارة طلبات القبول وسرعة الاستجابة للطلاب' : 'Admissions CRM and rapid inquiry desk'}
+            <p className="text-xs text-slate-400">
+              {isAr ? 'لوحة تحكم إدارة طلبات القبول والجامعات وسرعة الاستجابة' : 'Admissions CRM & Central University Management'}
             </p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          {loginError && (
+            <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{loginError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-4 text-start">
             <div>
-              <input
-                type="password"
-                placeholder={isAr ? 'أدخل رمز PIN الإداري (التجريبي: afaq2026)' : 'Enter Admin PIN (Demo: afaq2026)'}
-                value={adminPin}
-                onChange={(e) => setAdminPin(e.target.value)}
-                className={`w-full text-center py-3 px-4 rounded-xl border text-sm font-mono tracking-widest focus:outline-none focus:border-amber-500 ${
-                  isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
-                }`}
-              />
-              {pinError && (
-                <div className="text-xs text-red-400 font-bold mt-1.5">
-                  {isAr ? 'رمز الدخول غير صحيح، استخدم الرمز التجريبي: afaq2026' : 'Invalid PIN, use demo PIN: afaq2026'}
+              <label className="block text-xs font-bold mb-1.5 text-slate-400">
+                {isAr ? 'اسم المستخدم أو البريد الإلكتروني' : 'Username or Email'}
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 start-0 flex items-center ps-3.5 pointer-events-none text-slate-400">
+                  <User className="w-4 h-4" />
                 </div>
-              )}
+                <input
+                  type="text"
+                  required
+                  placeholder={isAr ? 'مثال: faisal@afaq-global.com أو admin' : 'e.g. faisal@afaq-global.com or admin'}
+                  value={usernameInput}
+                  onChange={(e) => {
+                    setUsernameInput(e.target.value);
+                    if (loginError) setLoginError(null);
+                  }}
+                  className={`w-full py-2.5 ps-10 pe-4 rounded-xl border text-sm focus:outline-none focus:border-amber-500 transition-colors ${
+                    isDark ? 'bg-slate-950 border-slate-700 text-white placeholder-slate-600' : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
+                  }`}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold mb-1.5 text-slate-400">
+                {isAr ? 'كلمة المرور' : 'Password'}
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 start-0 flex items-center ps-3.5 pointer-events-none text-slate-400">
+                  <Key className="w-4 h-4" />
+                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  placeholder={isAr ? 'أدخل كلمة المرور الخاصة بحسابك' : 'Enter your staff password'}
+                  value={passwordInput}
+                  onChange={(e) => {
+                    setPasswordInput(e.target.value);
+                    if (loginError) setLoginError(null);
+                  }}
+                  className={`w-full py-2.5 ps-10 pe-10 rounded-xl border text-sm focus:outline-none focus:border-amber-500 transition-colors ${
+                    isDark ? 'bg-slate-950 border-slate-700 text-white placeholder-slate-600' : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 end-0 flex items-center pe-3 text-slate-400 hover:text-slate-200 cursor-pointer"
+                  title={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <button
               type="submit"
-              className="w-full py-3 rounded-xl font-black text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg cursor-pointer transition-transform active:scale-98"
+              disabled={isLoggingIn}
+              className="w-full py-3 rounded-xl font-black text-xs bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 shadow-lg cursor-pointer transition-transform active:scale-98 flex items-center justify-center gap-2"
             >
-              {isAr ? 'تسجيل الدخول للنظام' : 'Access Admin Dashboard'}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setAdminPin('afaq2026');
-                setIsAuthenticated(true);
-              }}
-              className="w-full py-2 rounded-xl text-xs font-bold text-amber-500 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 transition-colors cursor-pointer"
-            >
-              {isAr ? '⚡ دخول فوري للمشرف التجريبي (1-Click Demo)' : '⚡ Quick 1-Click Demo Access'}
+              {isLoggingIn ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>{isAr ? 'جاري التحقق من الصلاحيات...' : 'Authenticating...'}</span>
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>{isAr ? 'تسجيل الدخول للنظام' : 'Sign In to Dashboard'}</span>
+                </>
+              )}
             </button>
           </form>
 
-          <div className="pt-4 border-t border-slate-800">
+          {/* Quick Persona Demo Selector */}
+          <div className="pt-3 border-t border-slate-800/80 space-y-2">
+            <div className="text-[11px] font-bold text-slate-400 text-center">
+              {isAr ? '⚡ حسابات تجريبية سريعة بحسب الصلاحيات:' : '⚡ Quick Demo Personas (1-Click Fill):'}
+            </div>
+            <div className="grid grid-cols-1 gap-1.5 text-start">
+              <button
+                type="button"
+                onClick={() => handleQuickPersonaSelect('faisal@afaq-global.com', 'admin123')}
+                className={`p-2 rounded-xl border text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                  usernameInput === 'faisal@afaq-global.com' 
+                    ? 'border-amber-500/60 bg-amber-500/10 text-amber-400' 
+                    : isDark ? 'border-slate-800 bg-slate-950/60 hover:border-slate-700 text-slate-300' : 'border-slate-200 bg-slate-50 hover:border-slate-300 text-slate-700'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-[10px]">
+                    <Crown className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-[11px]">{isAr ? 'د. فيصل الشمري' : 'Dr. Faisal'}</div>
+                    <div className="text-[9px] text-slate-400">faisal@afaq-global.com</div>
+                  </div>
+                </div>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 font-semibold border border-purple-500/30">
+                  {isAr ? 'مدير عام (Admin)' : 'Admin'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickPersonaSelect('sara@afaq-global.com', 'counselor123')}
+                className={`p-2 rounded-xl border text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                  usernameInput === 'sara@afaq-global.com' 
+                    ? 'border-amber-500/60 bg-amber-500/10 text-amber-400' 
+                    : isDark ? 'border-slate-800 bg-slate-950/60 hover:border-slate-700 text-slate-300' : 'border-slate-200 bg-slate-50 hover:border-slate-300 text-slate-700'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-[10px]">
+                    <GraduationCap className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-[11px]">{isAr ? 'أ. سارة المنصور' : 'Ms. Sara'}</div>
+                    <div className="text-[9px] text-slate-400">sara@afaq-global.com</div>
+                  </div>
+                </div>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 font-semibold border border-blue-500/30">
+                  {isAr ? 'مستشار أكاديمي' : 'Counselor'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickPersonaSelect('tariq@afaq-global.com', 'staff123')}
+                className={`p-2 rounded-xl border text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                  usernameInput === 'tariq@afaq-global.com' 
+                    ? 'border-amber-500/60 bg-amber-500/10 text-amber-400' 
+                    : isDark ? 'border-slate-800 bg-slate-950/60 hover:border-slate-700 text-slate-300' : 'border-slate-200 bg-slate-50 hover:border-slate-300 text-slate-700'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-[10px]">
+                    <UserCheck className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-[11px]">{isAr ? 'م. طارق الخالدي' : 'Eng. Tariq'}</div>
+                    <div className="text-[9px] text-slate-400">tariq@afaq-global.com</div>
+                  </div>
+                </div>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-semibold border border-emerald-500/30">
+                  {isAr ? 'موظف قبولات' : 'Staff'}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-800">
             <button
               onClick={onReturnToPublicSite}
-              className="text-xs font-semibold text-slate-400 hover:text-white flex items-center justify-center gap-1 mx-auto"
+              className="text-xs font-semibold text-slate-400 hover:text-white flex items-center justify-center gap-1 mx-auto cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>{isAr ? 'العودة إلى الموقع العام للطلاب' : 'Return to Public Student Site'}</span>
@@ -382,7 +584,30 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap justify-center">
+          <div className="flex items-center gap-3 flex-wrap justify-center">
+            {/* Logged in Staff Identity Card */}
+            {currentUser && (
+              <div className={`flex items-center gap-2.5 px-3 py-1.5 rounded-xl border ${
+                isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black ${
+                  currentUser.role === 'admin' 
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
+                    : currentUser.role === 'counselor' 
+                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+                    : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                }`}>
+                  {currentUser.role === 'admin' ? <Crown className="w-4 h-4" /> : currentUser.role === 'counselor' ? <GraduationCap className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                </div>
+                <div className="text-start">
+                  <div className="text-xs font-bold leading-none">{currentUser.name}</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">
+                    {currentUser.role === 'admin' ? (isAr ? 'مدير عام النظام' : 'Super Admin') : currentUser.role === 'counselor' ? (isAr ? 'مستشار أكاديمي' : 'Counselor') : (isAr ? 'موظف قبولات' : 'Staff')}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Theme Toggle */}
             <button
               onClick={onToggleTheme}
@@ -411,16 +636,17 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
               className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors flex items-center gap-1.5 shadow cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>{isAr ? 'العودة للموقع العام للطلاب' : 'Return to Student Site'}</span>
+              <span>{isAr ? 'الموقع العام' : 'Student Site'}</span>
             </button>
 
             {/* Logout Lock */}
             <button
               onClick={handleLogout}
-              className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-colors cursor-pointer"
+              className="px-2.5 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
               title={isAr ? 'تسجيل الخروج وقفل الجلسة' : 'Logout & Lock Session'}
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{isAr ? 'خروج' : 'Logout'}</span>
             </button>
           </div>
         </div>
@@ -1115,12 +1341,12 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
 
         {/* Tab 6: CMS Paragraphs & Text Manager */}
         {mainTab === 'cms' && (
-          <ParagraphsManager lang={lang} theme={theme} />
+          <ParagraphsManager lang={lang} theme={theme} onCMSUpdated={onCMSUpdated} />
         )}
 
         {/* Tab 7: Dynamic PostgreSQL Settings Manager */}
         {mainTab === 'settings' && (
-          <SettingsManager lang={lang} theme={theme} />
+          <SettingsManager lang={lang} theme={theme} onSettingsUpdated={onSettingsUpdated} />
         )}
 
         {/* Tab 8: Docker & Cloud Server Architecture */}

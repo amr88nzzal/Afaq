@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { LogoRenderer } from './LogoRenderer';
 import { Language, Theme } from '../types';
+import { SiteSettings } from '../services/api';
 import { 
   Globe, 
   UserCheck, 
@@ -15,7 +16,8 @@ import {
   Moon,
   Plane,
   ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  MessageCircle
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -28,6 +30,7 @@ interface NavbarProps {
   selectedLogoId: number;
   onOpenApplicationModal: () => void;
   onOpenCounselorBooking: () => void;
+  settings?: SiteSettings;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -40,10 +43,17 @@ export const Navbar: React.FC<NavbarProps> = ({
   selectedLogoId,
   onOpenApplicationModal,
   onOpenCounselorBooking,
+  settings,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
+
+  const rawWhatsapp = settings?.company_whatsapp || '+966 50 876 5432';
+  const cleanWhatsapp = rawWhatsapp.replace(/\D/g, '') || '966508765432';
+  const announcementText = isAr 
+    ? (settings?.announcement_banner_ar || 'تأمين القبول الجامعي في بريطانيا وأستراليا ونيوزيلندا مجاني 100% وبدون أتعاب وكالة')
+    : (settings?.announcement_banner_en || '100% Free University Placement for UK, Australia & New Zealand with direct accreditation');
 
   return (
     <header className={`sticky top-0 z-50 border-b shadow-md transition-colors duration-200 ${
@@ -59,19 +69,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               {isAr ? 'مجاني 100%' : '100% FREE'}
             </span>
             <span className="font-bold">
-              {isAr 
-                ? 'تأمين القبول الجامعي في بريطانيا وأستراليا ونيوزيلندا مجاني 100% وبدون أتعاب وكالة' 
-                : '100% Free University Placement for UK, Australia & New Zealand with direct accreditation'}
+              {announcementText}
             </span>
           </div>
           <div className="flex items-center gap-4 text-[11px]">
             <a 
-              href="https://wa.me/966541234567" 
+              href={`https://wa.me/${cleanWhatsapp}`} 
               target="_blank" 
               rel="noreferrer" 
               className="hover:underline flex items-center gap-1 font-black text-slate-950"
             >
-              <span>{isAr ? 'واتساب الاستشارات المباشر: 966541234567+' : 'Direct Advisor WhatsApp: +966 54 123 4567'}</span>
+              <MessageCircle className="w-3.5 h-3.5 fill-current" />
+              <span>{isAr ? `واتساب الاستشارات المباشر: ${rawWhatsapp}` : `Direct Advisor WhatsApp: ${rawWhatsapp}`}</span>
             </a>
             <span className="hidden sm:inline opacity-60">|</span>
             <span className="hidden sm:inline font-bold">

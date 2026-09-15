@@ -84,10 +84,10 @@ export const inMemoryStore = {
       portal_password: '123456',
       created_at: new Date().toISOString(),
       documents: [
-        { id: 1, doc_type: 'passport', name_ar: 'جواز السفر ساري المفعول', name_en: 'Valid Passport', status: 'verified', file_url: '/uploads/passports/app1_passport.pdf' },
-        { id: 2, doc_type: 'transcript', name_ar: 'كشف درجات الثانوية المعتمد', name_en: 'Academic Transcript', status: 'verified', file_url: '/uploads/transcripts/app1_transcript.pdf' },
-        { id: 3, doc_type: 'english_test', name_ar: 'شهادة اختبار اللغة (IELTS 7.0)', name_en: 'English Proficiency Test', status: 'verified', file_url: '/uploads/english/app1_ielts.pdf' },
-        { id: 4, doc_type: 'sop', name_ar: 'خطاب الغرض من الدراسة (SOP)', name_en: 'Statement of Purpose', status: 'pending', file_url: '/uploads/sop/app1_sop.pdf' }
+        { id: 1, doc_type: 'passport', name_ar: 'جواز السفر ساري المفعول', name_en: 'Valid Passport', status: 'verified', fileName: 'passport_abdulrahman.pdf', fileSize: '2.1 MB', file_url: '/uploads/passports/app1_passport.pdf', uploadedAt: '2026-09-10' },
+        { id: 2, doc_type: 'transcript', name_ar: 'كشف درجات الثانوية المعتمد', name_en: 'Academic Transcript', status: 'verified', fileName: 'transcript_certified.pdf', fileSize: '3.4 MB', file_url: '/uploads/transcripts/app1_transcript.pdf', uploadedAt: '2026-09-10' },
+        { id: 3, doc_type: 'english_test', name_ar: 'شهادة اختبار اللغة (IELTS 7.0)', name_en: 'English Proficiency Test', status: 'verified', fileName: 'ielts_academic_7.0.pdf', fileSize: '1.1 MB', file_url: '/uploads/english/app1_ielts.pdf', uploadedAt: '2026-09-11' },
+        { id: 4, doc_type: 'sop', name_ar: 'خطاب الغرض من الدراسة (SOP)', name_en: 'Statement of Purpose', status: 'pending', file_url: null }
       ],
       messages: [
         { id: 1, sender_type: 'user', sender_name: 'د. فيصل الشمري', message_text: 'مرحباً عبدالرحمن، تم استلام أوراقك وإرسالها للملحقية الأكاديمية.', is_internal_note: false, sent_at: new Date().toISOString() }

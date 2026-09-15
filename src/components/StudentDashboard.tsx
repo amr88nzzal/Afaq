@@ -442,19 +442,19 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             {/* Quick Demo Credentials Box for Testing */}
             <div className={`mt-6 pt-5 border-t space-y-2 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
               <div className="text-[11px] font-bold text-slate-400">
-                {isAr ? 'تجربة سريعة (طلب تجريبي جاهز):' : 'Quick Demo Access:'}
+                {isAr ? 'تجربة سريعة (طلب تجريبي جاهز ومسجل في النظام):' : 'Quick Demo Access (Registered Application):'}
               </div>
               <button
                 type="button"
-                onClick={() => handleQuickDemoLogin('AFQ-2026-1048', '123456')}
+                onClick={() => handleQuickDemoLogin('AFQ-2026-8812', '123456')}
                 className={`w-full p-2.5 rounded-xl border text-xs flex items-center justify-between transition-colors ${
                   isDark ? 'bg-slate-950 hover:bg-slate-800 border-slate-800 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
                 }`}
               >
                 <div className="flex items-center gap-2 font-mono text-[11px]">
-                  <span className="font-bold text-amber-500">AFQ-2026-1048</span>
+                  <span className="font-bold text-amber-500">AFQ-2026-8812</span>
                   <span className="text-slate-400">|</span>
-                  <span>محمد الدوسري</span>
+                  <span>{isAr ? 'عبدالرحمن العتيبي' : 'Abdulrahman Al-Otaibi'}</span>
                 </div>
                 <span className="text-[10px] font-bold text-emerald-500">{isAr ? 'دخول مباشر ➔' : 'Quick Access ➔'}</span>
               </button>
@@ -752,7 +752,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             {/* Documents List */}
             <div className="space-y-3">
               {documents.map((doc) => {
-                const isUploaded = (doc.status === 'uploaded' || doc.status === 'verified') && !!doc.fileName;
+                const isUploaded = !!doc.fileName || (!!doc.file_url && doc.file_url !== 'null') || doc.status === 'uploaded' || doc.status === 'verified';
                 const isUploading = uploadingDocId === doc.id;
                 const isDragOver = dragOverDocId === doc.id;
 
@@ -769,7 +769,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                       setDragOverDocId(null);
                       const files = e.dataTransfer.files;
                       if (files && files.length > 0) {
-                        validateAndUploadFile(doc.id, files[0]);
+                        validateAndUploadFile(doc.id, files[0], {
+                          nameAr: doc.nameAr,
+                          nameEn: doc.nameEn,
+                          docType: doc.category,
+                        });
                       }
                     }}
                     className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
@@ -788,7 +792,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          validateAndUploadFile(doc.id, file);
+                          validateAndUploadFile(doc.id, file, {
+                            nameAr: doc.nameAr,
+                            nameEn: doc.nameEn,
+                            docType: doc.category,
+                          });
                         }
                         e.target.value = '';
                       }}

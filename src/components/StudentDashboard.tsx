@@ -38,7 +38,7 @@ import {
   CheckCircle,
   FileCheck2
 } from 'lucide-react';
-import { studentPortalLoginAPI } from '../services/api';
+import { studentPortalLoginAPI, fetchMessagesAPI, sendMessageAPI } from '../services/api';
 
 const DEFAULT_TIMELINE: TimelineEvent[] = [
   { stage: 'submitted', titleAr: 'تم استلام الطلب', titleEn: 'Application Submitted', descriptionAr: 'تم تسجيل الطلب وتعيين مستشارك الخاص', descriptionEn: 'Application received and advisor assigned', isCompleted: true, isCurrent: false },
@@ -134,6 +134,40 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     },
   ]);
   const [newMsg, setNewMsg] = useState<string>('');
+  const [isSendingMsg, setIsSendingMsg] = useState<boolean>(false);
+
+  // Load persisted messages for the application on mount or change
+  React.useEffect(() => {
+    async function loadServerMessages() {
+      if (!application) return;
+      const appId = application.id || application.applicationNumber;
+      if (!appId) return;
+
+      const serverMsgs = await fetchMessagesAPI(appId);
+      if (serverMsgs && serverMsgs.length > 0) {
+        const mapped = serverMsgs.map((m: any) => ({
+          id: m.id ? m.id.toString() : Date.now().toString(),
+          sender: (m.sender_type === 'student' ? 'student' : 'counselor') as 'student' | 'counselor',
+          text: m.message_text || m.text || '',
+          time: m.sent_at 
+            ? new Date(m.sent_at).toLocaleTimeString(isAr ? 'ar-SA' : 'en-US', { hour: '2-digit', minute: '2-digit' })
+            : (isAr ? 'الآن' : 'Just now'),
+        }));
+        setChatMessages(mapped);
+      } else if (application.messages && application.messages.length > 0) {
+        const mapped = application.messages.map((m: any) => ({
+          id: m.id ? m.id.toString() : Date.now().toString(),
+          sender: (m.sender_type === 'student' ? 'student' : 'counselor') as 'student' | 'counselor',
+          text: m.message_text || m.text || '',
+          time: m.sent_at 
+            ? new Date(m.sent_at).toLocaleTimeString(isAr ? 'ar-SA' : 'en-US', { hour: '2-digit', minute: '2-digit' })
+            : (isAr ? 'الآن' : 'Just now'),
+        }));
+        setChatMessages(mapped);
+      }
+    }
+    loadServerMessages();
+  }, [application?.id, application?.applicationNumber, isAr]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,34 +209,62 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     }
   };
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMsg.trim()) return;
+    if (!newMsg.trim() || isSendingMsg) return;
 
-    const msgObj = {
+    const textToSend = newMsg.trim();
+    setNewMsg('');
+    setIsSendingMsg(true);
+
+    const appId = application?.id || application?.applicationNumber || '1';
+
+    // 1. Optimistic UI update
+    const tempMsg = {
       id: Date.now().toString(),
       sender: 'student' as const,
-      text: newMsg,
+      text: textToSend,
       time: isAr ? 'الآن' : 'Just now',
     };
+    setChatMessages(prev => [...prev, tempMsg]);
 
-    setChatMessages(prev => [...prev, msgObj]);
-    setNewMsg('');
+    // 2. Persist student message to backend API / Database
+    const res = await sendMessageAPI({
+      application_id: appId,
+      sender_type: 'student',
+      sender_name: application?.studentName || 'طالب آفاق',
+      message_text: textToSend,
+    });
 
-    // Counselor prompt response
-    setTimeout(() => {
-      setChatMessages(prev => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          sender: 'counselor',
-          text: isAr 
-            ? 'تم استلام استفسارك، وسيقوم مستشارك الأكاديمي المختص بمراجعته وتحديث ملفك فوراً.'
-            : 'Message received, your dedicated academic counselor will review and update your file shortly.',
-          time: isAr ? 'الآن' : 'Just now',
+    setIsSendingMsg(false);
+
+    if (res.success) {
+      // Automatic Counselor prompt response persisted to DB as well
+      setTimeout(async () => {
+        const autoText = isAr 
+          ? 'تم استلام استفسارك، وسيقوم مستشارك الأكاديمي المختص بمراجعته وتحديث ملفك فوراً.'
+          : 'Message received, your dedicated academic counselor will review and update your file shortly.';
+        
+        const counselorRes = await sendMessageAPI({
+          application_id: appId,
+          sender_type: 'counselor',
+          sender_name: application?.counselorName || 'المستشار الأكاديمي',
+          message_text: autoText,
+        });
+
+        if (counselorRes.success) {
+          setChatMessages(prev => [
+            ...prev,
+            {
+              id: counselorRes.data?.id ? counselorRes.data.id.toString() : (Date.now() + 1).toString(),
+              sender: 'counselor',
+              text: autoText,
+              time: isAr ? 'الآن' : 'Just now',
+            }
+          ]);
         }
-      ]);
-    }, 1000);
+      }, 1000);
+    }
   };
 
   // Maximum file size: 5 MB in bytes
@@ -1138,9 +1200,14 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                 />
                 <button
                   type="submit"
-                  className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold cursor-pointer"
+                  disabled={isSendingMsg || !newMsg.trim()}
+                  className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1"
                 >
-                  <Send className="w-3.5 h-3.5" />
+                  {isSendingMsg ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5" />
+                  )}
                 </button>
               </form>
             </div>

@@ -10,7 +10,9 @@ import {
   sendCredentialsEmailAPI,
   sendCustomStudentResponseAPI,
   checkServerHealthAPI,
-  loginStaffAPI
+  loginStaffAPI,
+  fetchMessagesAPI,
+  sendMessageAPI
 } from '../services/api';
 import { SettingsManager } from './SettingsManager';
 import { UniversitiesManager } from './UniversitiesManager';
@@ -157,13 +159,28 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   const [isSendingCreds, setIsSendingCreds] = useState<boolean>(false);
   const [isSendingResponse, setIsSendingResponse] = useState<boolean>(false);
 
-  // Sync selectedApp to edit form
+  // Selected App messages & chat history
+  const [appMessages, setAppMessages] = useState<any[]>([]);
+
+  // Sync selectedApp to edit form & load messages
   useEffect(() => {
     if (selectedApp) {
       setEditStatus(selectedApp.status || 'under_review');
       setEditPortalPassword(selectedApp.portalPassword || '');
+
+      async function loadAppMsgs() {
+        const msgs = await fetchMessagesAPI(selectedApp.id);
+        if (msgs && msgs.length > 0) {
+          setAppMessages(msgs);
+        } else if (selectedApp.messages && selectedApp.messages.length > 0) {
+          setAppMessages(selectedApp.messages);
+        } else {
+          setAppMessages([]);
+        }
+      }
+      loadAppMsgs();
     }
-  }, [selectedApp]);
+  }, [selectedApp?.id]);
 
   // جلب الطلبات الحية وفحص صحة البوستجريس
   useEffect(() => {
@@ -365,18 +382,33 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
     e.preventDefault();
     if (!selectedApp || !customMsg.trim() || isSendingResponse) return;
 
+    const messageText = customMsg.trim();
     setIsSendingResponse(true);
     try {
-      const res = await sendCustomStudentResponseAPI(selectedApp.id, dispatchChannel, customMsg.trim());
+      const res = await sendCustomStudentResponseAPI(selectedApp.id, dispatchChannel, messageText);
       
       // إطلاق إشعار العرض المحلي
-      onSendStudentAlert(selectedApp.id, dispatchChannel, customMsg);
+      onSendStudentAlert(selectedApp.id, dispatchChannel, messageText);
+
+      // حفظ الرسالة أيضاً في سجل المراسلات المعتمد بقاعدة البيانات
+      await sendMessageAPI({
+        application_id: selectedApp.id,
+        sender_id: currentUser?.id || 1,
+        sender_type: 'counselor',
+        sender_name: currentUser?.name || (isAr ? 'المستشار الأكاديمي' : 'Academic Counselor'),
+        message_text: `[${dispatchChannel.toUpperCase()}] ${messageText}`,
+      });
+
+      const updatedMsgs = await fetchMessagesAPI(selectedApp.id);
+      if (updatedMsgs && updatedMsgs.length > 0) {
+        setAppMessages(updatedMsgs);
+      }
 
       if (res.success) {
         setAlertSuccessToast(
           isAr 
-            ? `✅ تم إرسال ${dispatchChannel === 'email' ? 'الرد الرسمي بالبريد' : dispatchChannel === 'whatsapp' ? 'تنبيه الواتساب' : 'إشعار التلغرام'} بنجاح للطالب ${selectedApp.studentName}`
-            : `Dispatched message via ${dispatchChannel}`
+            ? `✅ تم إرسال وتخزين ${dispatchChannel === 'email' ? 'الرد الرسمي بالبريد' : dispatchChannel === 'whatsapp' ? 'تنبيه الواتساب' : 'إشعار التلغرام'} بنجاح للطالب ${selectedApp.studentName}`
+            : `Dispatched & saved message via ${dispatchChannel}`
         );
         setCustomMsg('');
       } else {
@@ -1368,6 +1400,53 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                     ) : (
                       <div className="p-3 text-center text-slate-400 text-xs">
                         {isAr ? 'لا توجد وثائق مدرجة في هذا الطلب' : 'No documents recorded'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Live Chat & Messages Log with Student */}
+                <div className={`p-4 rounded-2xl border space-y-3 ${
+                  isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold flex items-center gap-1.5 text-blue-400">
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>{isAr ? 'سجل المحادثات والرسائل المباشرة مع الطالب:' : 'Student Live Messages & Chat History:'}</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400 bg-slate-800/60 px-2 py-0.5 rounded-full border border-slate-700">
+                      {appMessages.length} {isAr ? 'رسائل' : 'messages'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {appMessages.length > 0 ? (
+                      appMessages.map((msg: any, idx: number) => {
+                        const isStudent = msg.sender_type === 'student';
+                        return (
+                          <div
+                            key={msg.id || idx}
+                            className={`p-2.5 rounded-xl text-xs max-w-[90%] ${
+                              isStudent
+                                ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30 mr-auto text-start'
+                                : isDark
+                                ? 'bg-slate-800 text-slate-200 border border-slate-700 ml-auto text-start'
+                                : 'bg-white text-slate-800 border border-slate-200 ml-auto text-start'
+                            }`}
+                          >
+                            <div className="text-[10px] text-slate-400 mb-1 flex items-center justify-between gap-2">
+                              <span className="font-bold text-amber-500">{msg.sender_name || (isStudent ? selectedApp.studentName : 'المستشار الأكاديمي')}</span>
+                              <span className="text-[9px] opacity-70">
+                                {msg.sent_at ? new Date(msg.sent_at).toLocaleTimeString(isAr ? 'ar-SA' : 'en-US', { hour: '2-digit', minute: '2-digit' }) : ''}
+                              </span>
+                            </div>
+                            <p className="whitespace-pre-wrap leading-relaxed">{msg.message_text}</p>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="p-3 text-center text-slate-400 text-xs italic">
+                        {isAr ? 'لا توجد رسائل سابقة من الطالب' : 'No previous messages from student'}
                       </div>
                     )}
                   </div>

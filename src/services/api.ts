@@ -590,3 +590,40 @@ export async function sendCustomStudentResponseAPI(
   }
 }
 
+// ==========================================
+// 10. إدارة المراسلات والمحادثات (Messages API)
+// ==========================================
+
+export async function fetchMessagesAPI(applicationId: string | number): Promise<any[]> {
+  try {
+    const res = await fetch(`/api/messages?application_id=${encodeURIComponent(applicationId)}`);
+    const json = await res.json();
+    return json.data || [];
+  } catch (err) {
+    console.warn('تعذر جلب الرسائل من السيرفر:', err);
+    return [];
+  }
+}
+
+export async function sendMessageAPI(msgData: {
+  application_id: string | number;
+  sender_id?: number | null;
+  sender_type?: 'student' | 'user' | 'counselor';
+  sender_name?: string;
+  message_text: string;
+  is_internal_note?: boolean;
+}): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const res = await fetch('/api/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(msgData),
+    });
+    const json = await res.json();
+    if (!res.ok) return { success: false, error: json.error || 'فشل إرسال الرسالة' };
+    return { success: true, data: json.data };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'تعذر الاتصال بالخادم' };
+  }
+}
+

@@ -5,9 +5,10 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { pool, isPostgresConnected, inMemoryStore } from '../db';
+import { pool, isPostgresConnected, inMemoryStore, saveStoreToDisk } from '../db';
 import { sendStudentCredentialsEmail, sendStatusUpdateNotification } from '../services/emailService';
 import { sendTelegramNotification } from '../services/telegramService';
+import { saveUploadedDocument } from '../utils/fileStorage';
 
 const router = Router();
 
@@ -455,8 +456,8 @@ router.patch('/:id/documents/:docId', async (req: Request, res: Response) => {
     const { status, feedback } = req.body;
 
     if (isPostgresConnected) {
-      const result = await pool.query(
-        'UPDATE documents SET status = $1, feedback = $2 WHERE id::text = $3 AND application_id IN (SELECT id FROM applications WHERE id::text = $4 OR application_number = $4) RETURNING *',
+      let result = await pool.query(
+        'UPDATE documents SET status = $1, feedback = $2 WHERE (id::text = $3 OR doc_type = $3) AND application_id IN (SELECT id FROM applications WHERE id::text = $4 OR application_number = $4) RETURNING *',
         [status, feedback || null, docId, id]
       );
       if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'المستند غير موجود' });
@@ -467,14 +468,20 @@ router.patch('/:id/documents/:docId', async (req: Request, res: Response) => {
     if (!app) return res.status(404).json({ success: false, error: 'الطلب غير موجود' });
 
     if (app.documents) {
-      const doc = app.documents.find((d: any) => d.id?.toString() === docId.toString());
+      const doc = app.documents.find((d: any) => 
+        d.id?.toString() === docId.toString() || 
+        d.doc_type === docId || 
+        d.category === docId
+      );
       if (doc) {
         doc.status = status;
         if (feedback !== undefined) (doc as any).feedback = feedback;
+        saveStoreToDisk();
         return res.json({ success: true, message: 'تم تحديث حالة المستند بنجاح', data: doc });
       }
     }
 
+    saveStoreToDisk();
     return res.json({ success: true, message: 'تم تحديث حالة المستند بنجاح' });
   } catch (error: any) {
     return res.status(500).json({ success: false, error: error.message });
@@ -542,78 +549,139 @@ router.put('/:id', async (req: Request, res: Response) => {
 router.post('/:id/documents', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { docId, docType, nameAr, nameEn, fileName, fileSize, fileUrl } = req.body;
+    let { docId, docType, nameAr, nameEn, fileName, fileSize, fileUrl } = req.body;
 
-    if (!fileName) {
-      return res.status(400).json({ success: false, error: 'اسم الملف مطلوب للرفع' });
+    if (!fileName && !fileUrl) {
+      return res.status(400).json({ success: false, error: 'اسم الملف أو بيانات الملف مطلوبة للرفع' });
+    }
+
+    const effectiveFileName = fileName || 'document.pdf';
+    let savedFileUrl = fileUrl || '';
+    let calculatedSize = fileSize || '1.2 MB';
+
+    // إذا كانت بيانات الملف بصيغة base64، احفظ الملف في مجلد /uploads/documents/ على خادم السيرفر
+    if (fileUrl && (fileUrl.startsWith('data:') || fileUrl.length > 500)) {
+      try {
+        const saved = saveUploadedDocument(id, docType || 'other', effectiveFileName, fileUrl);
+        savedFileUrl = saved.fileUrl;
+        calculatedSize = saved.fileSize || fileSize || '1.2 MB';
+      } catch (err: any) {
+        console.error('⚠️ [FileStorage] Error saving uploaded file to disk:', err.message);
+      }
+    }
+
+    if (!savedFileUrl) {
+      savedFileUrl = `/uploads/documents/${id}_${docType || 'doc'}_${Date.now()}.pdf`;
     }
 
     if (isPostgresConnected) {
       // Find numeric application id
-      const appRes = await pool.query('SELECT id FROM applications WHERE id::text = $1 OR application_number = $1 LIMIT 1', [id]);
+      const appRes = await pool.query('SELECT id, application_number FROM applications WHERE id::text = $1 OR application_number = $1 LIMIT 1', [id]);
       if (appRes.rows.length === 0) {
         return res.status(404).json({ success: false, error: 'الطلب غير موجود في قاعدة البيانات' });
       }
       const appId = appRes.rows[0].id;
 
-      // If updating an existing doc by id
+      // البحث عن المستند بالـ ID الرقمي أو بنوع الوثيقة category/doc_type
+      let existingDocId: number | null = null;
       if (docId && !isNaN(Number(docId))) {
+        const checkRes = await pool.query('SELECT id FROM documents WHERE id = $1 AND application_id = $2 LIMIT 1', [Number(docId), appId]);
+        if (checkRes.rows.length > 0) existingDocId = checkRes.rows[0].id;
+      }
+
+      if (!existingDocId && docType && docType !== 'other') {
+        const checkRes = await pool.query('SELECT id FROM documents WHERE application_id = $1 AND doc_type = $2 LIMIT 1', [appId, docType]);
+        if (checkRes.rows.length > 0) existingDocId = checkRes.rows[0].id;
+      }
+
+      if (!existingDocId && nameAr) {
+        const checkRes = await pool.query('SELECT id FROM documents WHERE application_id = $1 AND (name_ar = $2 OR name_en = $3) LIMIT 1', [appId, nameAr, nameEn || nameAr]);
+        if (checkRes.rows.length > 0) existingDocId = checkRes.rows[0].id;
+      }
+
+      let docRecord: any;
+      if (existingDocId) {
         const updateRes = await pool.query(
-          'UPDATE documents SET file_url = $1, status = $2, name_ar = COALESCE($3, name_ar), uploaded_at = NOW() WHERE id = $4 AND application_id = $5 RETURNING *',
-          [fileUrl || fileName, 'uploaded', nameAr || null, Number(docId), appId]
+          `UPDATE documents 
+           SET file_url = $1, 
+               status = 'uploaded', 
+               name_ar = COALESCE($2, name_ar), 
+               name_en = COALESCE($3, name_en), 
+               file_name = $4, 
+               file_size = $5, 
+               uploaded_at = NOW() 
+           WHERE id = $6 AND application_id = $7 
+           RETURNING *`,
+          [savedFileUrl, nameAr || null, nameEn || null, effectiveFileName, calculatedSize, existingDocId, appId]
         );
-        if (updateRes.rows.length > 0) {
-          return res.json({ success: true, message: 'تم رفع المستند بنجاح في قاعدة البيانات', data: updateRes.rows[0] });
-        }
+        docRecord = updateRes.rows[0];
+      } else {
+        const insertRes = await pool.query(
+          `INSERT INTO documents (application_id, doc_type, name_ar, name_en, status, file_url, file_name, file_size, uploaded_at) 
+           VALUES ($1, $2, $3, $4, 'uploaded', $5, $6, $7, NOW()) 
+           RETURNING *`,
+          [appId, docType || 'other', nameAr || effectiveFileName, nameEn || effectiveFileName, savedFileUrl, effectiveFileName, calculatedSize]
+        );
+        docRecord = insertRes.rows[0];
       }
 
-      // Check if document with same category exists for this application
-      if (docType && docType !== 'other') {
-        const existingCategoryDoc = await pool.query(
-          'SELECT id FROM documents WHERE application_id = $1 AND doc_type = $2 LIMIT 1',
-          [appId, docType]
+      // إضافة إشعار داخلي في سجل الرسائل
+      try {
+        await pool.query(
+          `INSERT INTO messages (application_id, sender_type, sender_name, message_text, is_internal_note, sent_at)
+           VALUES ($1, 'system', 'بوابة الطالب', $2, true, NOW())`,
+          [appId, `قام الطالب برفع وثيقة جديدة: (${nameAr || effectiveFileName}) - جاهزة للمراجعة والاعتماد`]
         );
-        if (existingCategoryDoc.rows.length > 0) {
-          const updateRes = await pool.query(
-            'UPDATE documents SET file_url = $1, status = $2, name_ar = COALESCE($3, name_ar), uploaded_at = NOW() WHERE id = $4 RETURNING *',
-            [fileUrl || fileName, 'uploaded', nameAr || null, existingCategoryDoc.rows[0].id]
-          );
-          return res.json({ success: true, message: 'تم تحديث المستند بنجاح', data: updateRes.rows[0] });
-        }
-      }
+      } catch (e) {}
 
-      // Insert new document record
-      const insertRes = await pool.query(
-        'INSERT INTO documents (application_id, doc_type, name_ar, name_en, status, file_url, uploaded_at) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
-        [appId, docType || 'other', nameAr || fileName, nameEn || fileName, 'uploaded', fileUrl || fileName]
-      );
-      return res.status(201).json({ success: true, message: 'تم رفع المستند الجديد بنجاح في قاعدة البيانات', data: insertRes.rows[0] });
+      const formattedDoc = {
+        id: docRecord.id.toString(),
+        doc_type: docRecord.doc_type,
+        category: docRecord.doc_type,
+        name_ar: docRecord.name_ar,
+        name_en: docRecord.name_en,
+        nameAr: docRecord.name_ar,
+        nameEn: docRecord.name_en,
+        status: 'uploaded',
+        fileName: docRecord.file_name || effectiveFileName,
+        file_name: docRecord.file_name || effectiveFileName,
+        fileSize: docRecord.file_size || calculatedSize,
+        file_size: docRecord.file_size || calculatedSize,
+        fileUrl: savedFileUrl,
+        file_url: savedFileUrl,
+        uploadedAt: new Date().toISOString().split('T')[0],
+        uploaded_at: docRecord.uploaded_at || new Date().toISOString(),
+      };
+
+      return res.json({ success: true, message: 'تم رفع المستند بنجاح وحفظه في قاعدة البيانات والخادم', data: formattedDoc });
     }
 
-    // In-memory fallback
+    // In-memory fallback persisted to disk
     const app = inMemoryStore.applications.find(a => a.id.toString() === id || a.application_number === id);
     if (!app) return res.status(404).json({ success: false, error: 'الطلب غير موجود' });
 
     if (!app.documents) app.documents = [];
     const existingIndex = app.documents.findIndex((d: any) => 
       (docId && d.id?.toString() === docId.toString()) || 
-      (docType && docType !== 'other' && (d.doc_type === docType || d.category === docType))
+      (docType && docType !== 'other' && (d.doc_type === docType || d.category === docType)) ||
+      (nameAr && (d.name_ar === nameAr || d.nameAr === nameAr))
     );
 
-    const docObj = {
-      id: docId || `doc-${Date.now()}`,
+    const docObj: any = {
+      id: existingIndex >= 0 ? app.documents[existingIndex].id : (docId || `doc-${Date.now()}`),
       doc_type: docType || 'other',
       category: docType || 'other',
-      name_ar: nameAr || fileName,
-      name_en: nameEn || fileName,
-      nameAr: nameAr || fileName,
-      nameEn: nameEn || fileName,
+      name_ar: nameAr || effectiveFileName,
+      name_en: nameEn || effectiveFileName,
+      nameAr: nameAr || effectiveFileName,
+      nameEn: nameEn || effectiveFileName,
       status: 'uploaded',
-      fileName,
-      file_name: fileName,
-      fileSize: fileSize || '1.4 MB',
-      file_size: fileSize || '1.4 MB',
-      file_url: fileUrl || fileName,
+      fileName: effectiveFileName,
+      file_name: effectiveFileName,
+      fileSize: calculatedSize,
+      file_size: calculatedSize,
+      fileUrl: savedFileUrl,
+      file_url: savedFileUrl,
       uploadedAt: new Date().toISOString().split('T')[0],
       uploaded_at: new Date().toISOString(),
     };
@@ -621,12 +689,16 @@ router.post('/:id/documents', async (req: Request, res: Response) => {
     if (existingIndex >= 0) {
       app.documents[existingIndex] = { ...app.documents[existingIndex], ...docObj };
     } else {
-      app.documents.push(docObj as any);
+      app.documents.push(docObj);
     }
     (app as any).updated_at = new Date().toISOString();
 
-    return res.json({ success: true, message: 'تم حفظ ورفع المستند بنجاح', data: docObj });
+    // حفظ التحديث فوراً في ملف store.json على القرص
+    saveStoreToDisk();
+
+    return res.json({ success: true, message: 'تم حفظ ورفع المستند بنجاح على السيرفر', data: docObj });
   } catch (error: any) {
+    console.error('Error in POST /documents:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
 });

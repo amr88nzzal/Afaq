@@ -231,7 +231,7 @@ export default function App() {
     setIsApplicationModalOpen(true);
   };
 
-  const handleUpdateStudentDocument = (
+  const handleUpdateStudentDocument = async (
     docId: string, 
     fileName: string, 
     extraData?: {
@@ -242,36 +242,61 @@ export default function App() {
       nameEn?: string;
     }
   ) => {
+    if (!activeStudentApp) return;
+
+    const targetId = activeStudentApp.applicationNumber || activeStudentApp.id;
+
+    // 1. Send upload request to backend server
+    const response = await uploadStudentDocumentAPI(targetId, {
+      docId,
+      docType: extraData?.docType || 'other',
+      nameAr: extraData?.nameAr || fileName,
+      nameEn: extraData?.nameEn || fileName,
+      fileName,
+      fileSize: extraData?.fileSize,
+      fileUrl: extraData?.fileUrl,
+    });
+
+    const serverDoc = response.success ? response.data : null;
+    const finalFileUrl = serverDoc?.file_url || serverDoc?.fileUrl || (extraData?.fileUrl?.startsWith('data:') ? undefined : extraData?.fileUrl);
+    const finalDocId = serverDoc?.id || docId;
+
     setActiveStudentApp(prev => {
       if (!prev) return null;
       const currentDocs = prev.documents || [];
-      const docIndex = currentDocs.findIndex(d => d.id === docId);
+      const docIndex = currentDocs.findIndex(d => 
+        d.id === docId || 
+        d.id === finalDocId || 
+        d.category === extraData?.docType || 
+        (d as any).doc_type === extraData?.docType
+      );
 
       let newDocs: DocumentItem[];
       if (docIndex >= 0) {
-        newDocs = currentDocs.map(d => 
-          d.id === docId 
+        newDocs = currentDocs.map((d, idx) => 
+          idx === docIndex 
             ? { 
                 ...d, 
+                id: String(finalDocId),
                 fileName, 
-                fileSize: extraData?.fileSize || d.fileSize, 
-                file_url: extraData?.fileUrl || d.file_url,
+                fileSize: serverDoc?.file_size || serverDoc?.fileSize || extraData?.fileSize || d.fileSize, 
+                file_url: finalFileUrl || d.file_url,
                 status: fileName ? ('uploaded' as const) : ('pending' as const),
-                uploadedAt: new Date().toISOString().split('T')[0]
+                uploadedAt: serverDoc?.uploadedAt || new Date().toISOString().split('T')[0]
               } 
             : d
         );
       } else {
         const newDoc: DocumentItem = {
-          id: docId,
+          id: String(finalDocId),
           nameAr: extraData?.nameAr || fileName,
           nameEn: extraData?.nameEn || fileName,
           category: (extraData?.docType as any) || 'other',
           required: false,
           status: 'uploaded',
           fileName,
-          fileSize: extraData?.fileSize,
-          file_url: extraData?.fileUrl,
+          fileSize: serverDoc?.file_size || serverDoc?.fileSize || extraData?.fileSize,
+          file_url: finalFileUrl,
           uploadedAt: new Date().toISOString().split('T')[0]
         };
         newDocs = [...currentDocs, newDoc];
@@ -281,23 +306,20 @@ export default function App() {
         ...prev,
         documents: newDocs,
       };
-      try {
-        localStorage.setItem('afaq_active_app', JSON.stringify(updated));
-      } catch (e) {}
 
-      // Background API sync
-      if (prev.id || prev.applicationNumber) {
-        const targetId = prev.applicationNumber || prev.id;
-        uploadStudentDocumentAPI(targetId, {
-          docId,
-          docType: extraData?.docType || 'other',
-          nameAr: extraData?.nameAr || fileName,
-          nameEn: extraData?.nameEn || fileName,
-          fileName,
-          fileSize: extraData?.fileSize,
-          fileUrl: extraData?.fileUrl,
-        }).catch(() => {});
-      }
+      try {
+        // تنظيف الكائن لعدم تجاوز سعة localStorage
+        const safeStorageCopy = JSON.parse(JSON.stringify(updated));
+        if (safeStorageCopy.documents) {
+          safeStorageCopy.documents = safeStorageCopy.documents.map((d: any) => {
+            if (d.file_url && d.file_url.startsWith('data:')) {
+              return { ...d, file_url: `/uploads/documents/${d.fileName || 'file.pdf'}` };
+            }
+            return d;
+          });
+        }
+        localStorage.setItem('afaq_active_app', JSON.stringify(safeStorageCopy));
+      } catch (e) {}
 
       return updated;
     });

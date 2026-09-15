@@ -1293,21 +1293,32 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                                   </button>
                                 </div>
                               ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setDispatchChannel('whatsapp');
-                                    setCustomMsg(isAr 
-                                      ? `عزيزي الطالب ${selectedApp.studentName}، يرجى الدخول لبوابة الطالب ورفع وثيقة (${doc.nameAr}) المطلوبة لاستكمال ملفك الجامعي.`
-                                      : `Dear ${selectedApp.studentName}, please access your student portal and upload the required (${doc.nameEn}) document.`);
-                                    setAlertSuccessToast(isAr ? 'تم تجهيز رسالة تذكير للطالب في حقل المراسلة أدناه' : 'Reminder loaded into message box below');
-                                    setTimeout(() => setAlertSuccessToast(null), 3000);
-                                  }}
-                                  className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-500 text-[10px] font-bold transition-colors flex items-center gap-1 cursor-pointer"
-                                >
-                                  <Bell className="w-3 h-3" />
-                                  <span>{isAr ? 'تذكير الطالب بالرفع' : 'Remind Student'}</span>
-                                </button>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleVerifyDocument(doc.id)}
+                                    className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1"
+                                    title={isAr ? 'اعتماد الوثيقة مباشرة إذا تم استلامها خارجياً' : 'Direct manual approval'}
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                    <span>{isAr ? 'اعتماد مباشر' : 'Direct Approval'}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setDispatchChannel('whatsapp');
+                                      setCustomMsg(isAr 
+                                        ? `عزيزي الطالب ${selectedApp.studentName}، يرجى الدخول لبوابة الطالب ورفع وثيقة (${doc.nameAr}) المطلوبة لاستكمال ملفك الجامعي.`
+                                        : `Dear ${selectedApp.studentName}, please access your student portal and upload the required (${doc.nameEn}) document.`);
+                                      setAlertSuccessToast(isAr ? 'تم تجهيز رسالة تذكير للطالب في حقل المراسلة أدناه' : 'Reminder loaded into message box below');
+                                      setTimeout(() => setAlertSuccessToast(null), 3000);
+                                    }}
+                                    className="px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-500 text-[11px] font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Bell className="w-3.5 h-3.5" />
+                                    <span>{isAr ? 'تذكير' : 'Remind'}</span>
+                                  </button>
+                                </div>
                               )}
                             </div>
                           </div>

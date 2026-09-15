@@ -188,6 +188,38 @@ export const inMemoryStore = {
   } as Record<string, string>,
 };
 
+const storeFilePath = path.join(process.cwd(), 'server', 'data', 'store.json');
+
+export function saveStoreToDisk(): void {
+  try {
+    const dir = path.dirname(storeFilePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(storeFilePath, JSON.stringify(inMemoryStore, null, 2), 'utf8');
+  } catch (err: any) {
+    console.error('⚠️ [Store] Error writing store to disk:', err.message);
+  }
+}
+
+export function loadStoreFromDisk(): void {
+  try {
+    if (fs.existsSync(storeFilePath)) {
+      const data = fs.readFileSync(storeFilePath, 'utf8');
+      const parsed = JSON.parse(data);
+      if (parsed && Array.isArray(parsed.applications)) {
+        Object.assign(inMemoryStore, parsed);
+        console.log(`📦 [Store] Successfully loaded ${parsed.applications.length} persisted applications from server disk.`);
+      }
+    }
+  } catch (err: any) {
+    console.error('⚠️ [Store] Error reading store from disk:', err.message);
+  }
+}
+
+// Automatically load store from disk on startup
+loadStoreFromDisk();
+
 export async function testDbConnection(): Promise<boolean> {
   try {
     const client = await pool.connect();
@@ -201,6 +233,18 @@ export async function testDbConnection(): Promise<boolean> {
       console.log('✅ [Database] تم تنفيذ init.sql وتأسيس الجداول والبيانات بنجاح');
     }
 
+    // تحديث وتعديل الهيكل لتوسيع الأعمدة (Migrations)
+    try {
+      await client.query(`
+        ALTER TABLE documents ALTER COLUMN file_url TYPE TEXT;
+        ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_name VARCHAR(255);
+        ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_size VARCHAR(50);
+      `);
+      console.log('✅ [Database] Schema updated: file_url column set to TEXT and file details added.');
+    } catch (migErr: any) {
+      console.log('ℹ️ [Database] Migration note:', migErr.message);
+    }
+
     isPostgresConnected = true;
     console.log('✅ [Database] متصل بقاعدة بيانات PostgreSQL بنجاح في:', res.rows[0].now);
     
@@ -208,7 +252,7 @@ export async function testDbConnection(): Promise<boolean> {
     return true;
   } catch (error: any) {
     isPostgresConnected = false;
-    console.warn('ℹ️ [Database] يعمل الآن بنظام الذاكرة المتكامل (In-Memory Engine) لعدم توفر خادم PostgreSQL محلي:', error.message);
+    console.warn('ℹ️ [Database] يعمل الآن بنظام الذاكرة المتكامل المحفوظ على القرص (In-Memory Engine with File Persistence):', error.message);
     return false;
   }
 }

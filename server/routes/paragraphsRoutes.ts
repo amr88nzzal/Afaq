@@ -5,7 +5,7 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { pool, isPostgresConnected, inMemoryStore } from '../db';
+import { pool, isPostgresConnected, inMemoryStore, saveStoreToDisk } from '../db';
 import { cacheManager } from '../services/cacheManager';
 
 const router = Router();
@@ -90,8 +90,16 @@ router.put('/:slug', async (req: Request, res: Response) => {
       }
     }
 
-    // إبطال كاش الفقرات فوراً
+    // إذا كان النص المعدل هو الشريط العلوي للتنبيهات، نقوم بتحديث الإعدادات العامة والحفظ في القرص مباشرة
+    if (slug === 'announcement' || slug === 'announcement_banner') {
+      if (text_ar) inMemoryStore.settings.announcement_banner_ar = text_ar;
+      if (text_en) inMemoryStore.settings.announcement_banner_en = text_en;
+    }
+
+    // حفظ التغييرات في القرص وإبطال الكاش فوراً
+    saveStoreToDisk();
     cacheManager.invalidate('paragraphs');
+    cacheManager.invalidate('settings');
 
     return res.json({ success: true, message: 'تم تحديث النص بنجاح وتحديث الكاش فوراً', data: updatedData });
   } catch (error: any) {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { LogoRenderer } from './LogoRenderer';
-import { Language, Theme } from '../types';
+import { Language, Theme, CMSParagraphEntity } from '../types';
 import { SiteSettings } from '../services/api';
 import { 
   Globe, 
@@ -31,6 +31,7 @@ interface NavbarProps {
   onOpenApplicationModal: () => void;
   onOpenCounselorBooking: () => void;
   settings?: SiteSettings;
+  cmsParagraphs?: CMSParagraphEntity[];
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -44,6 +45,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenApplicationModal,
   onOpenCounselorBooking,
   settings,
+  cmsParagraphs,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isAr = lang === 'ar';
@@ -51,9 +53,11 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const rawWhatsapp = settings?.company_whatsapp || '+966 50 876 5432';
   const cleanWhatsapp = rawWhatsapp.replace(/\D/g, '') || '966508765432';
+  
+  const announcementPara = cmsParagraphs?.find(p => p.slug === 'announcement' || p.slug === 'announcement_banner');
   const announcementText = isAr 
-    ? (settings?.announcement_banner_ar || 'تأمين القبول الجامعي في بريطانيا وأستراليا ونيوزيلندا مجاني 100% وبدون أتعاب وكالة')
-    : (settings?.announcement_banner_en || '100% Free University Placement for UK, Australia & New Zealand with direct accreditation');
+    ? (announcementPara?.text_ar || settings?.announcement_banner_ar || 'التسجيل مفتوح الآن للفصل الدراسي 2026/2027 مع منح تفوق تصل حتى 40% من الرسوم الدراسية')
+    : (announcementPara?.text_en || settings?.announcement_banner_en || 'Admissions now open for 2026/2027 intakes with merit scholarships up to 40% tuition reduction');
 
   return (
     <header className={`sticky top-0 z-50 border-b shadow-md transition-colors duration-200 ${

@@ -163,7 +163,7 @@ export const inMemoryStore = {
     { id: 1, slug: 'hero_main', section_name: 'الرئيسية', title_ar: 'العنوان الرئيسي', title_en: 'Hero Title', text_ar: 'بوابتك المعتمدة للقبول الجامعي في بريطانيا، أستراليا ونيوزيلندا', text_en: 'Your Certified Gateway to Premier UK, Australian & New Zealand Universities' },
     { id: 2, slug: 'hero_sub', section_name: 'الرئيسية', title_ar: 'الوصف الترويجي', title_en: 'Hero Subtitle', text_ar: 'قبولك الجامعي مجاناً 100% وبدون أي أتعاب وكالة. تمثيل رسمي ومعتمد لأعرق الجامعات العالمية.', text_en: '100% Free Placement with Zero Agency Fees. Official and Certified Representative.' },
     { id: 3, slug: 'why_us', section_name: 'عن آفاق', title_ar: 'لماذا آفاق العالمية؟', title_en: 'Why Choose Afaq?', text_ar: 'نمتلك شراكات رسمية مباشرة مع كبرى الجامعات ونضمن للطالب التوجيه الأكاديمي السليم واستخراج القبولات خلال وقت قياسي.', text_en: 'We hold direct official agency agreements with prestigious universities, securing your offers in record time.' },
-    { id: 4, slug: 'announcement', section_name: 'التنبيهات', title_ar: 'شريط التنبيهات العلوي', title_en: 'Top Announcement Bar', text_ar: 'التسجيل مفتوح الآن للفصل الدراسي 2026/2027 مع منح تفوق تصل حتى 30%', text_en: 'Admissions now open for 2026/2027 intakes with scholarships up to 30%' }
+    { id: 4, slug: 'announcement', section_name: 'التنبيهات', title_ar: 'شريط التنبيهات العلوي', title_en: 'Top Announcement Bar', text_ar: 'التسجيل مفتوح الآن للفصل الدراسي 2026/2027 مع منح تفوق تصل حتى 40% من الرسوم الدراسية', text_en: 'Admissions now open for 2026/2027 intakes with merit scholarships up to 40% tuition reduction' }
   ],
   settings: {
     company_name_ar: '*** آفاق العالمية للخدمات التعليمية والقبولات الجامعية',
@@ -180,8 +180,8 @@ export const inMemoryStore = {
     hero_title_en: 'Your Certified Gateway to Premier UK, Australian & New Zealand Universities',
     hero_subtitle_ar: 'قبولك الجامعي مجاناً 100% وبدون أي أتعاب وكالة. تمثيل رسمي ومعتمد لأعرق الجامعات العالمية.',
     hero_subtitle_en: '100% Free Placement with Zero Agency Fees. Official and Certified Representative of Leading World Universities.',
-    announcement_banner_ar: 'التسجيل مفتوح الآن للفصل الدراسي القادم 2026/2027 مع منح تفوق تصل حتى 30%',
-    announcement_banner_en: 'Admissions now open for 2026/2027 intakes with scholarships up to 30%',
+    announcement_banner_ar: 'التسجيل مفتوح الآن للفصل الدراسي 2026/2027 مع منح تفوق تصل حتى 40% من الرسوم الدراسية',
+    announcement_banner_en: 'Admissions now open for 2026/2027 intakes with merit scholarships up to 40% tuition reduction',
     admin_notification_email: 'admin@amrodev.com, amr.nzzal@gmail.com',
     telegram_bot_token: process.env.TELEGRAM_BOT_TOKEN || '',
     telegram_chat_id: process.env.TELEGRAM_CHAT_ID || '',

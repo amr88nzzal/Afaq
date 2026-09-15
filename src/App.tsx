@@ -365,6 +365,7 @@ export default function App() {
         lang={lang}
         theme={theme}
         settings={settings}
+        cmsParagraphs={cmsParagraphs}
         onToggleTheme={handleToggleTheme}
         onToggleLang={handleToggleLang}
         activeView={activeView as any}

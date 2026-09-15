@@ -8,7 +8,7 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { pool, isPostgresConnected, inMemoryStore } from '../db';
+import { pool, isPostgresConnected, inMemoryStore, saveStoreToDisk } from '../db';
 import { cacheManager } from '../services/cacheManager';
 
 const router = Router();
@@ -111,8 +111,19 @@ router.put('/', async (req: Request, res: Response) => {
       }
     }
 
-    // إبطال وتحديث الذاكرة التشغيلية المؤقتة فوراً (Cache Invalidation)
+    // إذا تم تعديل شريط التنبيه في الإعدادات، نحدث الفقرة المناظرة في inMemoryStore.paragraphs
+    if (updates.announcement_banner_ar || updates.announcement_banner_en) {
+      const annIndex = inMemoryStore.paragraphs.findIndex(p => p.slug === 'announcement' || p.slug === 'announcement_banner');
+      if (annIndex >= 0) {
+        if (updates.announcement_banner_ar) inMemoryStore.paragraphs[annIndex].text_ar = updates.announcement_banner_ar;
+        if (updates.announcement_banner_en) inMemoryStore.paragraphs[annIndex].text_en = updates.announcement_banner_en;
+      }
+    }
+
+    // حفظ التغييرات في القرص وإبطال وتحديث الذاكرة التشغيلية المؤقتة فوراً
+    saveStoreToDisk();
     cacheManager.invalidate('settings');
+    cacheManager.invalidate('paragraphs');
     cacheManager.set('settings', inMemoryStore.settings, 15 * 60 * 1000);
 
     console.log('⚡ [Cache Invalidated & Updated] تم تحديث كاش إعدادات النظام فوراً:', Object.keys(updates));

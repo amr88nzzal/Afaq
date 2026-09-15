@@ -140,6 +140,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   const [selectedApp, setSelectedApp] = useState<Application | null>(applications[0]);
   const [alertSuccessToast, setAlertSuccessToast] = useState<string | null>(null);
   const [previewDoc, setPreviewDoc] = useState<any | null>(null);
+  const [previewImageError, setPreviewImageError] = useState<boolean>(false);
 
   // Selected App editable fields
   const [editStatus, setEditStatus] = useState<string>('');
@@ -1256,7 +1257,10 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                               {isUploaded && (
                                 <button
                                   type="button"
-                                  onClick={() => setPreviewDoc(doc)}
+                                  onClick={() => {
+                                    setPreviewDoc(doc);
+                                    setPreviewImageError(false);
+                                  }}
                                   className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
                                     isDark ? 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-200' : 'bg-white hover:bg-slate-100 border-slate-300 text-slate-700'
                                   }`}
@@ -1661,23 +1665,31 @@ docker compose logs -f afaq_backend`}
                   </div>
                 </div>
 
-                {previewDoc.file_url?.startsWith('data:image') || 
-                 /\.(jpg|jpeg|png|webp|gif)$/i.test(previewDoc.fileName || previewDoc.file_url || '') ? (
+                {!previewImageError && (
+                  previewDoc.file_url?.startsWith('data:image') || 
+                  /\.(jpg|jpeg|png|webp|gif)$/i.test(previewDoc.fileName || previewDoc.file_name || previewDoc.file_url || '')
+                ) ? (
                   <div className="max-h-72 overflow-hidden rounded-xl border border-slate-800 flex items-center justify-center bg-slate-950 p-2">
                     <img 
-                      src={previewDoc.file_url && !previewDoc.file_url.startsWith('data:') 
-                        ? previewDoc.file_url 
-                        : (previewDoc.file_url || `/api/applications/${selectedApp?.id || selectedApp?.applicationNumber}/documents/${previewDoc.id}/file`)} 
-                      alt={previewDoc.fileName || 'Document'} 
+                      src={
+                        previewDoc.file_url && previewDoc.file_url.startsWith('data:image')
+                          ? previewDoc.file_url
+                          : `/api/applications/${selectedApp?.id || selectedApp?.applicationNumber}/documents/${previewDoc.id || previewDoc.doc_type || previewDoc.category}/file`
+                      } 
+                      alt={previewDoc.fileName || previewDoc.nameAr || 'Document'} 
                       className="max-h-72 object-contain rounded-lg shadow"
+                      onError={() => setPreviewImageError(true)}
                     />
                   </div>
                 ) : (
-                  <div className="p-6 rounded-xl border border-dashed border-slate-700/80 text-center space-y-2 bg-slate-950/20">
+                  <div className="p-5 rounded-xl border border-dashed border-slate-700/80 text-center space-y-2 bg-slate-950/40">
                     <FileCheck2 className="w-10 h-10 text-emerald-400 mx-auto" />
-                    <div className="font-bold text-sm text-slate-200">{previewDoc.fileName || 'document.pdf'}</div>
-                    <p className="text-slate-400 text-[11px]">
-                      {isAr ? 'تم حفظ المستند في قاعدة البيانات والخادم ويمكن اعتماده أو تحميله مباشرة.' : 'Document is stored securely on the server and ready for review.'}
+                    <div>
+                      <div className="font-bold text-sm text-slate-200">{previewDoc.fileName || previewDoc.file_name || previewDoc.nameAr || 'document.pdf'}</div>
+                      <div className="text-slate-400 text-xs font-mono mt-0.5">{previewDoc.fileSize || previewDoc.file_size || '87 KB'}</div>
+                    </div>
+                    <p className="text-slate-400 text-[11px] max-w-sm mx-auto">
+                      {isAr ? 'تم حفظ المستند في قاعدة البيانات والخادم ويمكنك اعتماده أو فتح الملف المرفوع مباشرة.' : 'Document is stored securely on the server and ready for review.'}
                     </p>
                   </div>
                 )}

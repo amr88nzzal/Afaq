@@ -5,6 +5,8 @@
  */
 
 import { Router, Request, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 import { pool, isPostgresConnected, inMemoryStore, saveStoreToDisk } from '../db';
 import { sendStudentCredentialsEmail, sendStatusUpdateNotification } from '../services/emailService';
 import { sendTelegramNotification } from '../services/telegramService';
@@ -733,6 +735,89 @@ router.delete('/:id/documents/:docId', async (req: Request, res: Response) => {
     }
 
     return res.json({ success: true, message: 'تم إلغاء رفع المستند بنجاح' });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * عرض وتنزيل ملف المستند المرفوع مباشرة وبثه للمتصفح
+ * GET /api/applications/:id/documents/:docId/file
+ */
+router.get('/:id/documents/:docId/file', async (req: Request, res: Response) => {
+  try {
+    const { id, docId } = req.params;
+    let fileUrl = '';
+    let fileName = 'document.pdf';
+
+    if (isPostgresConnected) {
+      const docRes = await pool.query(
+        'SELECT file_url, file_name, name_ar FROM documents WHERE (id::text = $1 OR doc_type = $1) AND application_id IN (SELECT id FROM applications WHERE id::text = $2 OR application_number = $2) LIMIT 1',
+        [docId, id]
+      );
+      if (docRes.rows.length > 0) {
+        fileUrl = docRes.rows[0].file_url || '';
+        fileName = docRes.rows[0].file_name || docRes.rows[0].name_ar || 'document.pdf';
+      }
+    }
+
+    if (!fileUrl) {
+      const app = inMemoryStore.applications.find(a => a.id.toString() === id || a.application_number === id);
+      if (app && app.documents) {
+        const doc: any = app.documents.find((d: any) => d.id?.toString() === docId.toString() || d.doc_type === docId || d.category === docId);
+        if (doc) {
+          fileUrl = doc.file_url || doc.fileUrl || '';
+          fileName = doc.file_name || doc.fileName || doc.name_ar || doc.nameAr || 'document.pdf';
+        }
+      }
+    }
+
+    // 1. إذا كان الملف مخزناً بصيغة Base64
+    if (fileUrl && fileUrl.startsWith('data:')) {
+      const matches = fileUrl.match(/^data:([^;]+);base64,(.*)$/);
+      if (matches) {
+        const mimeType = matches[1];
+        const buffer = Buffer.from(matches[2], 'base64');
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileName)}"`);
+        return res.send(buffer);
+      }
+    }
+
+    // 2. إذا كان الملف مخزناً بمسار نسبي على الخادم
+    if (fileUrl) {
+      const cleanUrl = fileUrl.startsWith('/') ? fileUrl.substring(1) : fileUrl;
+      const pathsToTry = [
+        path.join(process.cwd(), 'public', cleanUrl),
+        path.join(process.cwd(), cleanUrl),
+        path.join(process.cwd(), 'public', 'uploads', 'documents', path.basename(cleanUrl)),
+        path.join(process.cwd(), 'uploads', 'documents', path.basename(cleanUrl)),
+      ];
+
+      for (const p of pathsToTry) {
+        if (fs.existsSync(p) && fs.statSync(p).isFile()) {
+          return res.sendFile(p);
+        }
+      }
+    }
+
+    // 3. البحث الشامل في مجلد المرفقات عن أي ملف متوافق
+    const uploadsDirs = [
+      path.join(process.cwd(), 'public', 'uploads', 'documents'),
+      path.join(process.cwd(), 'uploads', 'documents'),
+    ];
+
+    for (const uDir of uploadsDirs) {
+      if (fs.existsSync(uDir)) {
+        const files = fs.readdirSync(uDir);
+        const match = files.find(f => f.includes(id) || f.includes(docId) || (fileName && f.includes(fileName)));
+        if (match) {
+          return res.sendFile(path.join(uDir, match));
+        }
+      }
+    }
+
+    return res.status(404).json({ success: false, error: 'تعذر العثور على الملف في الخادم' });
   } catch (error: any) {
     return res.status(500).json({ success: false, error: error.message });
   }

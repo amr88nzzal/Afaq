@@ -335,20 +335,20 @@
         {
           "id": 1,
           "doc_type": "passport",
-          "name_ar": "جواز السفر ساري المفعول",
-          "name_en": "Valid Passport",
+          "name_ar": "جواز السفر",
+          "name_en": "Passport",
           "status": "uploaded",
-          "fileName": "test_passport.pdf",
+          "fileName": "trotsch-hausaufgabenheft-1x1-farbige-wochentage-din-a5.jpg",
           "fileSize": "0 KB",
-          "file_url": "/uploads/documents/AFQ-2026-8812_passport_1789500975580_test_passport.pdf",
+          "file_url": "/uploads/documents/AFQ-2026-8812_passport_1789501790413_trotsch-hausaufgabenheft-1x1-farbige-wochentage-din-a5.jpg",
           "uploadedAt": "2026-09-15",
           "category": "passport",
-          "nameAr": "جواز السفر ساري المفعول",
-          "nameEn": "Valid Passport",
-          "file_name": "test_passport.pdf",
+          "nameAr": "جواز السفر",
+          "nameEn": "Passport",
+          "file_name": "trotsch-hausaufgabenheft-1x1-farbige-wochentage-din-a5.jpg",
           "file_size": "0 KB",
-          "fileUrl": "/uploads/documents/AFQ-2026-8812_passport_1789500975580_test_passport.pdf",
-          "uploaded_at": "2026-09-15T19:36:15.580Z"
+          "fileUrl": "/uploads/documents/AFQ-2026-8812_passport_1789501790413_trotsch-hausaufgabenheft-1x1-farbige-wochentage-din-a5.jpg",
+          "uploaded_at": "2026-09-15T19:49:50.413Z"
         },
         {
           "id": 2,
@@ -391,7 +391,7 @@
           "sent_at": "2026-09-15T19:36:14.005Z"
         }
       ],
-      "updated_at": "2026-09-15T19:36:15.580Z"
+      "updated_at": "2026-09-15T19:49:50.413Z"
     },
     {
       "id": 2,

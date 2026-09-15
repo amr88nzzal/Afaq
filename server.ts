@@ -56,11 +56,16 @@ async function startServer() {
   app.use('/api/messages', messagesRoutes);
 
   // --------------------------------------------------------------------------
-  // خدمة الملفات الثابتة والصور الرسمية (Public Static Assets & Images)
+  // خدمة الملفات الثابتة والصور الرسمية والملفات المرفوعة (Public Static Assets & Images)
   // --------------------------------------------------------------------------
   const publicPath = path.join(process.cwd(), 'public');
+  const rootUploadsPath = path.join(process.cwd(), 'uploads');
+  const publicUploadsPath = path.join(publicPath, 'uploads');
+
   app.use(express.static(publicPath));
   app.use('/images', express.static(path.join(publicPath, 'images')));
+  app.use('/uploads', express.static(publicUploadsPath));
+  app.use('/uploads', express.static(rootUploadsPath));
 
   // --------------------------------------------------------------------------
   // خادم الواجهة الأمامية (Vite Middleware in Dev / Static Files in Prod)

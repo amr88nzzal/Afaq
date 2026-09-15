@@ -1661,32 +1661,39 @@ docker compose logs -f afaq_backend`}
                   </div>
                 </div>
 
-                {previewDoc.file_url?.startsWith('data:image') ? (
-                  <div className="max-h-64 overflow-hidden rounded-xl border border-slate-800 flex items-center justify-center bg-black/40">
-                    <img src={previewDoc.file_url} alt={previewDoc.fileName} className="max-h-64 object-contain" />
+                {previewDoc.file_url?.startsWith('data:image') || 
+                 /\.(jpg|jpeg|png|webp|gif)$/i.test(previewDoc.fileName || previewDoc.file_url || '') ? (
+                  <div className="max-h-72 overflow-hidden rounded-xl border border-slate-800 flex items-center justify-center bg-slate-950 p-2">
+                    <img 
+                      src={previewDoc.file_url && !previewDoc.file_url.startsWith('data:') 
+                        ? previewDoc.file_url 
+                        : (previewDoc.file_url || `/api/applications/${selectedApp?.id || selectedApp?.applicationNumber}/documents/${previewDoc.id}/file`)} 
+                      alt={previewDoc.fileName || 'Document'} 
+                      className="max-h-72 object-contain rounded-lg shadow"
+                    />
                   </div>
                 ) : (
                   <div className="p-6 rounded-xl border border-dashed border-slate-700/80 text-center space-y-2 bg-slate-950/20">
                     <FileCheck2 className="w-10 h-10 text-emerald-400 mx-auto" />
-                    <div className="font-bold text-sm">{previewDoc.fileName || 'document.pdf'}</div>
+                    <div className="font-bold text-sm text-slate-200">{previewDoc.fileName || 'document.pdf'}</div>
                     <p className="text-slate-400 text-[11px]">
-                      {isAr ? 'تم حفظ المستند في قاعدة البيانات والخادم ويمكن اعتماده مباشرة.' : 'Document is stored securely on the server and ready for review.'}
+                      {isAr ? 'تم حفظ المستند في قاعدة البيانات والخادم ويمكن اعتماده أو تحميله مباشرة.' : 'Document is stored securely on the server and ready for review.'}
                     </p>
                   </div>
                 )}
               </div>
 
               <div className="flex items-center justify-between gap-3 pt-2">
-                {previewDoc.file_url && (
-                  <a
-                    href={previewDoc.file_url}
-                    download={previewDoc.fileName || 'document.pdf'}
-                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span>{isAr ? 'تحميل الوثيقة' : 'Download File'}</span>
-                  </a>
-                )}
+                <a
+                  href={`/api/applications/${selectedApp?.id || selectedApp?.applicationNumber}/documents/${previewDoc.id}/file`}
+                  download={previewDoc.fileName || 'document.pdf'}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black flex items-center gap-1.5 transition-colors cursor-pointer shadow"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>{isAr ? 'تحميل الوثيقة' : 'Download File'}</span>
+                </a>
                 {previewDoc.status !== 'verified' && (
                   <button
                     onClick={() => {

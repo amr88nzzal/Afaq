@@ -8,6 +8,7 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { testDbConnection, isPostgresConnected } from './server/db';
+import { cacheManager } from './server/services/cacheManager';
 import settingsRoutes from './server/routes/settingsRoutes';
 import universitiesRoutes from './server/routes/universitiesRoutes';
 import applicationsRoutes from './server/routes/applicationsRoutes';
@@ -18,6 +19,7 @@ import customersRoutes from './server/routes/customersRoutes';
 import meetingsRoutes from './server/routes/meetingsRoutes';
 import paragraphsRoutes from './server/routes/paragraphsRoutes';
 import messagesRoutes from './server/routes/messagesRoutes';
+import cacheRoutes from './server/routes/cacheRoutes';
 
 async function startServer() {
   const app = express();
@@ -39,11 +41,12 @@ async function startServer() {
       service: 'Afaq Global Education API',
       domain: 'afaq-global.amrodev.com',
       postgresConnected: isPostgresConnected,
+      cacheEngineStats: cacheManager.getStats(),
       timestamp: new Date().toISOString(),
     });
   });
 
-  // مسارات الجداول الأساسية
+  // مسارات الجداول الأساسية والذاكرة المؤقتة
   app.use('/api/settings', settingsRoutes);
   app.use('/api/countries', countriesRoutes);
   app.use('/api/universities', universitiesRoutes);
@@ -54,6 +57,7 @@ async function startServer() {
   app.use('/api/meetings', meetingsRoutes);
   app.use('/api/paragraphs', paragraphsRoutes);
   app.use('/api/messages', messagesRoutes);
+  app.use('/api/cache', cacheRoutes);
 
   // --------------------------------------------------------------------------
   // خدمة الملفات الثابتة والصور الرسمية والملفات المرفوعة (Public Static Assets & Images)

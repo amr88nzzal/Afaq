@@ -9,6 +9,7 @@
 
 import { Router, Request, Response } from 'express';
 import { pool, isPostgresConnected, inMemoryStore } from '../db';
+import { cacheManager } from '../services/cacheManager';
 
 const router = Router();
 
@@ -18,37 +19,51 @@ const router = Router();
  */
 router.get('/', async (req: Request, res: Response) => {
   try {
-    if (isPostgresConnected) {
-      const result = await pool.query('SELECT key, value_ar, value_en, value_numeric, category FROM settings');
-      const settingsObj: Record<string, any> = {};
-      
-      result.rows.forEach(row => {
-        // Flatten into standard key-values and also provide structured values
-        if (row.value_ar && row.value_en) {
-          settingsObj[`${row.key}_ar`] = row.value_ar;
-          settingsObj[`${row.key}_en`] = row.value_en;
-        } else if (row.value_ar) {
-          settingsObj[row.key] = row.value_ar;
-          settingsObj[`${row.key}_ar`] = row.value_ar;
-        } else if (row.value_en) {
-          settingsObj[row.key] = row.value_en;
-          settingsObj[`${row.key}_en`] = row.value_en;
-        } else if (row.value_numeric !== null) {
-          settingsObj[row.key] = row.value_numeric;
+    const result = await cacheManager.getOrFetch(
+      'settings',
+      async () => {
+        if (isPostgresConnected) {
+          let rows: any[] = [];
+          try {
+            const queryRes = await pool.query('SELECT * FROM settings');
+            rows = queryRes.rows;
+          } catch {
+            const queryRes2 = await pool.query('SELECT * FROM site_settings');
+            rows = queryRes2.rows;
+          }
+
+          const settingsObj: Record<string, any> = {};
+          rows.forEach(row => {
+            const mainVal = row.value ?? row.value_ar ?? row.value_en ?? row.value_numeric;
+            if (row.key) {
+              settingsObj[row.key] = mainVal !== undefined && mainVal !== null ? String(mainVal) : '';
+
+              if (row.value_ar) settingsObj[`${row.key}_ar`] = row.value_ar;
+              if (row.value_en) settingsObj[`${row.key}_en`] = row.value_en;
+            }
+          });
+
+          return { ...inMemoryStore.settings, ...settingsObj };
         }
+        return { ...inMemoryStore.settings };
+      },
+      15 * 60 * 1000,
+      isPostgresConnected ? 'postgres' : 'in-memory'
+    );
 
-        settingsObj[row.key] = settingsObj[row.key] || row.value_ar || row.value_en || '';
-      });
+    res.setHeader('X-Cache', result.isCached ? 'HIT' : 'MISS');
+    res.setHeader('X-Response-Time', `${result.responseTimeMs}ms`);
 
-      const merged = { ...inMemoryStore.settings, ...settingsObj };
-      return res.json({ success: true, source: 'postgres', data: merged });
-    }
-
-    // الرد من الذاكرة في حال عدم تشغيل بوستجريس
-    return res.json({ success: true, source: 'in-memory', data: inMemoryStore.settings });
+    return res.json({
+      success: true,
+      cached: result.isCached,
+      source: result.isCached ? 'active-server-cache' : (isPostgresConnected ? 'postgres' : 'in-memory'),
+      data: result.data,
+      responseTimeMs: result.responseTimeMs,
+    });
   } catch (error: any) {
     console.error('Error fetching settings:', error.message);
-    return res.status(500).json({ success: false, error: error.message, data: inMemoryStore.settings });
+    return res.status(200).json({ success: true, source: 'in-memory-fallback', data: inMemoryStore.settings });
   }
 });
 
@@ -96,10 +111,14 @@ router.put('/', async (req: Request, res: Response) => {
       }
     }
 
-    console.log('⚙️ [Settings Updated] تم تحديث إعدادات النظام بنجاح:', Object.keys(updates));
+    // إبطال وتحديث الذاكرة التشغيلية المؤقتة فوراً (Cache Invalidation)
+    cacheManager.invalidate('settings');
+    cacheManager.set('settings', inMemoryStore.settings, 15 * 60 * 1000);
+
+    console.log('⚡ [Cache Invalidated & Updated] تم تحديث كاش إعدادات النظام فوراً:', Object.keys(updates));
     return res.json({
       success: true,
-      message: 'تم حفظ وتحديث الإعدادات بنجاح في قاعدة البيانات',
+      message: 'تم حفظ وتحديث الإعدادات بنجاح في قاعدة البيانات وتجديد الذاكرة التشغيلية',
       data: inMemoryStore.settings
     });
   } catch (error: any) {

@@ -38,14 +38,14 @@ export interface SiteSettings {
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
-  company_name_ar: 'آفاق العالمية للخدمات التعليمية والقبولات الجامعية',
+  company_name_ar: '*** آفاق العالمية للخدمات التعليمية والقبولات الجامعية',
   company_name_en: 'Afaq Global Education & University Placements',
-  company_phone: '+966 50 876 5432',
-  company_whatsapp: '+966 50 876 5432',
-  company_email: 'admissions@afaq-global.amrodev.com',
-  support_email: 'support@afaq-global.amrodev.com',
-  company_address_ar: 'المملكة العربية السعودية، الرياض - طريق الملك فهد - برج الفيصلية، الطابق 14',
-  company_address_en: 'King Fahd Road, Al Faisaliah Tower, 14th Floor, Riyadh, Saudi Arabia',
+  company_phone: '+61468827480',
+  company_whatsapp: '+491556009968',
+  company_email: 'afaq@amrodev.com',
+  support_email: 'support@amrodev.com',
+  company_address_ar: 'استراليا - سيدني - شارع الحرية 15',
+  company_address_en: 'Australia - Sydney - 15 Liberty Street',
   working_hours_ar: 'الأحد إلى الخميس: 9:00 صباحاً - 6:00 مساءً (توقيت مكة)',
   working_hours_en: 'Sunday to Thursday: 9:00 AM - 6:00 PM (GMT+3)',
   hero_title_ar: 'بوابتك المعتمدة للقبول الجامعي في بريطانيا، أستراليا ونيوزيلندا',

@@ -57,8 +57,8 @@ export default function App() {
 
   const refreshSettings = async () => {
     try {
-      const s = await getSiteSettings();
-      if (s) setSettings(s);
+      const res = await getSiteSettings();
+      if (res && res.settings) setSettings(res.settings);
     } catch (err) {
       console.error('Failed to load site settings in App', err);
     }

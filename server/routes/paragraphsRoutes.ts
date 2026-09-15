@@ -6,6 +6,7 @@
 
 import { Router, Request, Response } from 'express';
 import { pool, isPostgresConnected, inMemoryStore } from '../db';
+import { cacheManager } from '../services/cacheManager';
 
 const router = Router();
 
@@ -15,11 +16,29 @@ const router = Router();
  */
 router.get('/', async (req: Request, res: Response) => {
   try {
-    if (isPostgresConnected) {
-      const result = await pool.query('SELECT * FROM paragraphs ORDER BY id ASC');
-      return res.json({ success: true, source: 'postgres', data: result.rows });
-    }
-    return res.json({ success: true, source: 'in-memory', data: inMemoryStore.paragraphs });
+    const result = await cacheManager.getOrFetch(
+      'paragraphs',
+      async () => {
+        if (isPostgresConnected) {
+          const queryRes = await pool.query('SELECT * FROM paragraphs ORDER BY id ASC');
+          return queryRes.rows;
+        }
+        return inMemoryStore.paragraphs;
+      },
+      15 * 60 * 1000,
+      isPostgresConnected ? 'postgres' : 'in-memory'
+    );
+
+    res.setHeader('X-Cache', result.isCached ? 'HIT' : 'MISS');
+    res.setHeader('X-Response-Time', `${result.responseTimeMs}ms`);
+
+    return res.json({
+      success: true,
+      cached: result.isCached,
+      source: result.isCached ? 'active-server-cache' : (isPostgresConnected ? 'postgres' : 'in-memory'),
+      data: result.data,
+      responseTimeMs: result.responseTimeMs,
+    });
   } catch (error: any) {
     return res.status(500).json({ success: false, error: error.message });
   }
@@ -33,6 +52,8 @@ router.put('/:slug', async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
     const { title_ar, title_en, text_ar, text_en, section_name } = req.body;
+
+    let updatedData: any = null;
 
     if (isPostgresConnected) {
       const result = await pool.query(
@@ -48,26 +69,31 @@ router.put('/:slug', async (req: Request, res: Response) => {
          RETURNING *`,
         [slug, section_name || 'عام', title_ar, title_en, text_ar, text_en]
       );
-      return res.json({ success: true, message: 'تم تحديث النص بنجاح', data: result.rows[0] });
+      updatedData = result.rows[0];
+    } else {
+      const index = inMemoryStore.paragraphs.findIndex(p => p.slug === slug);
+      if (index >= 0) {
+        inMemoryStore.paragraphs[index] = { ...inMemoryStore.paragraphs[index], ...req.body };
+        updatedData = inMemoryStore.paragraphs[index];
+      } else {
+        const newPara = {
+          id: Date.now(),
+          slug,
+          section_name: section_name || 'عام',
+          title_ar: title_ar || slug,
+          title_en: title_en || slug,
+          text_ar: text_ar || '',
+          text_en: text_en || '',
+        };
+        inMemoryStore.paragraphs.push(newPara);
+        updatedData = newPara;
+      }
     }
 
-    const index = inMemoryStore.paragraphs.findIndex(p => p.slug === slug);
-    if (index >= 0) {
-      inMemoryStore.paragraphs[index] = { ...inMemoryStore.paragraphs[index], ...req.body };
-      return res.json({ success: true, message: 'تم تحديث النص بنجاح', data: inMemoryStore.paragraphs[index] });
-    }
+    // إبطال كاش الفقرات فوراً
+    cacheManager.invalidate('paragraphs');
 
-    const newPara = {
-      id: Date.now(),
-      slug,
-      section_name: section_name || 'عام',
-      title_ar: title_ar || slug,
-      title_en: title_en || slug,
-      text_ar: text_ar || '',
-      text_en: text_en || '',
-    };
-    inMemoryStore.paragraphs.push(newPara);
-    return res.json({ success: true, message: 'تم حفظ النص بنجاح', data: newPara });
+    return res.json({ success: true, message: 'تم تحديث النص بنجاح وتحديث الكاش فوراً', data: updatedData });
   } catch (error: any) {
     return res.status(500).json({ success: false, error: error.message });
   }

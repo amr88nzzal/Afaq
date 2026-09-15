@@ -36,22 +36,22 @@ export const Footer: React.FC<FooterProps> = ({
   const isDark = theme === 'dark';
 
   const companyName = isAr 
-    ? (settings?.company_name_ar || 'آفاق العالمية للخدمات التعليمية والقبولات الجامعية')
+    ? (settings?.company_name_ar || '*** آفاق العالمية للخدمات التعليمية والقبولات الجامعية')
     : (settings?.company_name_en || 'Afaq Global Education & University Placements');
 
   const companyAddress = isAr
-    ? (settings?.company_address_ar || 'المملكة العربية السعودية، الرياض - طريق الملك فهد - برج الفيصلية، الطابق 14')
-    : (settings?.company_address_en || 'King Fahd Road, Al Faisaliah Tower, 14th Floor, Riyadh, Saudi Arabia');
+    ? (settings?.company_address_ar || 'استراليا - سيدني - شارع الحرية 15')
+    : (settings?.company_address_en || 'Australia - Sydney - 15 Liberty Street');
 
   const workingHours = isAr
     ? (settings?.working_hours_ar || 'الأحد إلى الخميس: 9:00 صباحاً - 6:00 مساءً (توقيت مكة)')
     : (settings?.working_hours_en || 'Sunday to Thursday: 9:00 AM - 6:00 PM (GMT+3)');
 
-  const phone = settings?.company_phone || '+966 50 876 5432';
-  const rawWhatsapp = settings?.company_whatsapp || '+966 50 876 5432';
-  const cleanWhatsapp = rawWhatsapp.replace(/\D/g, '') || '966508765432';
-  const email = settings?.company_email || 'admissions@afaq-global.amrodev.com';
-  const supportEmail = settings?.support_email || 'support@afaq-global.amrodev.com';
+  const phone = settings?.company_phone || '+61468827480';
+  const rawWhatsapp = settings?.company_whatsapp || '+491556009968';
+  const cleanWhatsapp = rawWhatsapp.replace(/\D/g, '') || '491556009968';
+  const email = settings?.company_email || 'afaq@amrodev.com';
+  const supportEmail = settings?.support_email || 'support@amrodev.com';
 
   return (
     <footer className={`border-t text-start transition-colors duration-200 ${

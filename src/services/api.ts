@@ -570,3 +570,23 @@ export async function sendCredentialsEmailAPI(appId: string): Promise<{ success:
     return { success: false, message: err.message || 'تعذر إرسال البريد' };
   }
 }
+
+export async function sendCustomStudentResponseAPI(
+  appId: string, 
+  channel: 'email' | 'whatsapp' | 'telegram', 
+  messageText: string
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const res = await fetch(`/api/applications/${appId}/send-response`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel, messageText }),
+    });
+    const json = await res.json();
+    if (!res.ok) return { success: false, error: json.error || 'فشل إرسال الرسالة' };
+    return { success: true, message: json.message };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'تعذر الاتصال بالخادم' };
+  }
+}
+

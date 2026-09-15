@@ -44,14 +44,18 @@ export const LogoLab: React.FC<LogoLabProps> = ({
         
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-10 space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-500 text-xs font-bold">
             <Palette className="w-3.5 h-3.5" />
             <span>{isAr ? 'مختبر الهوية البصرية وتحليل الشعارات المقترحة' : 'Brand Identity & Logo Proposals Lab'}</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black text-white">
+          <h1 className={`text-3xl sm:text-4xl font-black ${
+            isDark ? 'text-white' : 'text-slate-900'
+          }`}>
             {isAr ? 'دراسة وتحسين خيارات الشعار السبعة (آفاق العالمية)' : 'Evaluation & Refinement of the 7 Logo Concepts'}
           </h1>
-          <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+          <p className={`text-sm sm:text-base leading-relaxed ${
+            isDark ? 'text-slate-300' : 'text-slate-600'
+          }`}>
             {isAr 
               ? 'قمنا بتحليل النماذج السبعة المرفوعة من قبلكم تفصيلياً، ودراسة فلسفة الرموز وتناسقها مع طلاب الخليج والجامعات العالمية، مع تقديم مقترحات لتطويرها واختبارها مباشرة على الموقع.'
               : 'Detailed artistic, cultural, and typographical analysis for each of the 7 uploaded logo proposals with refinement recommendations.'}
@@ -68,10 +72,10 @@ export const LogoLab: React.FC<LogoLabProps> = ({
               <button
                 key={proposal.id}
                 onClick={() => setActiveTab(proposal.id)}
-                className={`p-3 rounded-xl border text-start transition-all relative flex flex-col justify-between ${
+                className={`p-3 rounded-xl border text-start transition-all relative flex flex-col justify-between cursor-pointer ${
                   isSelected 
-                    ? 'bg-slate-800 border-amber-400 ring-2 ring-amber-400/20 shadow-lg' 
-                    : 'bg-slate-900/90 border-slate-800 hover:bg-slate-800/60'
+                    ? 'bg-amber-500/15 border-amber-400 ring-2 ring-amber-400/20 shadow-lg' 
+                    : isDark ? 'bg-slate-900/90 border-slate-800 hover:bg-slate-800/60' : 'bg-white border-slate-200 hover:bg-slate-100 shadow-xs'
                 }`}
               >
                 {isLive && (
@@ -79,15 +83,19 @@ export const LogoLab: React.FC<LogoLabProps> = ({
                     {isAr ? 'المعتمد حياً' : 'Live'}
                   </span>
                 )}
-                <div className="text-xs font-bold text-amber-300 mb-1">
+                <div className="text-xs font-bold text-amber-500 mb-1">
                   {isAr ? `الخيار ${proposal.id}` : `Option ${proposal.id}`}
                 </div>
-                <div className="text-[11px] text-slate-200 line-clamp-2 leading-tight">
+                <div className={`text-[11px] line-clamp-2 leading-tight ${
+                  isDark ? 'text-slate-200' : 'text-slate-700 font-medium'
+                }`}>
                   {isAr ? proposal.titleAr.split(':')[1] || proposal.titleAr : proposal.titleEn}
                 </div>
-                <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-800 pt-1.5">
+                <div className={`mt-2 flex items-center justify-between text-[10px] border-t pt-1.5 ${
+                  isDark ? 'text-slate-400 border-slate-800' : 'text-slate-500 border-slate-200'
+                }`}>
                   <span>{isAr ? 'الملاءمة' : 'Appeal'}</span>
-                  <span className="font-bold text-amber-400">{proposal.culturalAppealScore}/10</span>
+                  <span className="font-bold text-amber-500">{proposal.culturalAppealScore}/10</span>
                 </div>
               </button>
             );

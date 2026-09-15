@@ -159,19 +159,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-              <span>{isAr ? 'دراسة المنافسين' : 'Strategy Research'}</span>
-            </button>
-
-            <button
-              onClick={() => onNavigate('logo-lab')}
-              className={`px-3 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 ${
-                activeView === 'logo-lab' 
-                  ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30' 
-                  : isDark ? 'text-slate-200 hover:text-white hover:bg-slate-850' : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100'
-              }`}
-            >
-              <Palette className="w-3.5 h-3.5 text-amber-500" />
-              <span>{isAr ? 'مختبر الشعارات (7)' : 'Logo Lab'}</span>
+              <span>{isAr ? 'ما يميزنا (لأننا نهتم بكم)' : 'Why Choose Us'}</span>
             </button>
           </nav>
 
@@ -304,14 +292,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => { onNavigate('research'); setMobileMenuOpen(false); }}
             className="w-full py-2.5 px-3 rounded-xl text-xs font-bold text-start text-emerald-400"
           >
-            {isAr ? 'دراسة المواقع المنافسة والقرارات' : 'Competitive Benchmarking'}
-          </button>
-
-          <button
-            onClick={() => { onNavigate('logo-lab'); setMobileMenuOpen(false); }}
-            className="w-full py-2.5 px-3 rounded-xl text-xs font-bold text-start text-amber-400"
-          >
-            {isAr ? 'مختبر الشعارات (7 خيارات)' : 'Logo Lab (7 Options)'}
+            {isAr ? 'ما يميزنا (لأننا نهتم بكم)' : 'Why Choose Us'}
           </button>
 
           <div className="pt-2">

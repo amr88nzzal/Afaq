@@ -307,3 +307,76 @@ export async function sendStatusUpdateNotification(data: {
   }
 }
 
+/**
+ * إرسال خطاب/رد رسمي مخصص إلى بريد الطالب من قبل المستشار الأكاديمي
+ */
+export async function sendCustomStudentEmailResponse(data: {
+  studentName: string;
+  studentEmail: string;
+  applicationNumber: string;
+  messageText: string;
+}): Promise<{ success: boolean; message: string }> {
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; color: #1e293b; }
+        .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0; }
+        .header { background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); color: #ffffff; padding: 24px; text-align: center; }
+        .badge { display: inline-block; background-color: #d97706; color: #ffffff; font-weight: bold; font-size: 12px; padding: 4px 12px; border-radius: 9999px; margin-bottom: 8px; }
+        .content { padding: 24px; line-height: 1.7; font-size: 14px; }
+        .msg-box { background: #f1f5f9; border-right: 4px solid #d97706; padding: 16px; border-radius: 8px; margin: 16px 0; font-size: 14px; white-space: pre-wrap; color: #0f172a; }
+        .footer { background: #f8fafc; padding: 16px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="badge">إشعار رسمي من قسم القبول والابتعاث 🎓</div>
+          <h2 style="margin: 0; font-size: 20px;">آفاق العالمية للخدمات التعليمية</h2>
+          <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.9;">متابعة طلب القبول رقم: ${data.applicationNumber}</p>
+        </div>
+        <div class="content">
+          <p>عزيزي الطالب <strong>${data.studentName}</strong>،</p>
+          <p>أرسل لك قسم القبول والمتابعة الأكاديمية الرد الرسمي التالي بشأن طلبك:</p>
+          
+          <div class="msg-box">
+            ${data.messageText}
+          </div>
+
+          <p style="font-size: 13px; color: #64748b;">
+            💡 يمكنك مراجعة المستندات والرد مباشرة عبر تسجيل الدخول إلى <a href="https://afaq-global.amrodev.com/#student-portal" style="color: #d97706; font-weight: bold;">بوابة الطالب الخاصة بك</a>.
+          </p>
+        </div>
+        <div class="footer">
+          آفاق العالمية للخدمات التعليمية والقبولات الجامعية<br>
+          © 2026 Afaq Global Education
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  if (!transporter) {
+    console.log(`📨 [Email Simulated] تم إرسال الخطاب الرسمي للطالب [${data.studentEmail}]: ${data.messageText}`);
+    return { success: true, message: 'تم تسجيل الإيميل بنجاح (وضع المحاكاة الخادمي)' };
+  }
+
+  try {
+    const info = await transporter.sendMail({
+      from: `"Afaq Global Admissions" <${GMAIL_USER}>`,
+      to: data.studentEmail,
+      subject: `📧 إشعار رسمي من آفاق بشأن طلبك رقم [${data.applicationNumber}]`,
+      html: htmlContent,
+    });
+    console.log(`✅ [Custom Email Sent] تم إرسال البريد للطالب (${data.studentEmail}) بنجاح: ${info.messageId}`);
+    return { success: true, message: `Email sent successfully: ${info.messageId}` };
+  } catch (error: any) {
+    console.error('❌ [Custom Email Error] فشل إرسال البريد للطالب:', error.message);
+    return { success: false, message: error.message };
+  }
+}
+
+

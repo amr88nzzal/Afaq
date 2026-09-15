@@ -785,6 +785,14 @@ export default function App() {
           <StaffDashboard
             lang={lang}
             theme={theme}
+            selectedLogoId={selectedLogoId}
+            onSelectLogo={(id) => {
+              setSelectedLogoId(id);
+              triggerNotification('whatsapp', 
+                isAr ? 'تم اعتماد الشعار الجديد للموقع' : 'New Logo Activated',
+                isAr ? `تم تحديث شعار الموقع بالكامل بنجاح إلى النموذج رقم ${id}!` : `Logo Option ${id} set as primary brand mark!`
+              );
+            }}
             onToggleTheme={handleToggleTheme}
             onToggleLang={handleToggleLang}
             onCountriesUpdated={refreshCountries}

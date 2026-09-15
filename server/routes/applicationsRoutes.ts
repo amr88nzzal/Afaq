@@ -8,7 +8,7 @@ import { Router, Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { pool, isPostgresConnected, inMemoryStore, saveStoreToDisk } from '../db';
-import { sendStudentCredentialsEmail, sendStatusUpdateNotification } from '../services/emailService';
+import { sendStudentCredentialsEmail, sendStatusUpdateNotification, sendCustomStudentEmailResponse } from '../services/emailService';
 import { sendTelegramNotification } from '../services/telegramService';
 import { saveUploadedDocument } from '../utils/fileStorage';
 
@@ -953,6 +953,90 @@ router.post('/:id/send-credentials', async (req: Request, res: Response) => {
     return res.json({ success: true, message: 'تم إرسال بيانات الدخول بنجاح إلى بريد الطالب' });
   } catch (error: any) {
     return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * إرسال خطاب/رد رسمي وتنبيهات مخصصة للطالب
+ * POST /api/applications/:id/send-response
+ */
+router.post('/:id/send-response', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { channel, messageText } = req.body;
+
+    if (!messageText || !messageText.trim()) {
+      return res.status(400).json({ success: false, error: 'نص الرسالة مطلوب' });
+    }
+
+    let studentEmail = '';
+    let studentName = '';
+    let appNum = '';
+
+    if (isPostgresConnected) {
+      const appRes = await pool.query(`
+        SELECT c.name, c.email, a.application_number
+        FROM applications a
+        JOIN customers c ON a.customer_id = c.id
+        WHERE a.id::text = $1 OR a.application_number = $1
+      `, [id]);
+
+      if (appRes.rows.length > 0) {
+        studentName = appRes.rows[0].name;
+        studentEmail = appRes.rows[0].email;
+        appNum = appRes.rows[0].application_number;
+      }
+    }
+
+    if (!studentEmail) {
+      const app: any = inMemoryStore.applications.find(a => a.id.toString() === id || a.application_number === id);
+      if (app) {
+        studentName = app.customer_name || app.student_name || app.studentName || 'الطالب';
+        studentEmail = app.customer_email || app.studentEmail || 'student@example.com';
+        appNum = app.application_number || app.id.toString();
+      }
+    }
+
+    // حفظ الرسالة الصادرة في قاعدة البيانات وفي قائمة الرسائل
+    if (isPostgresConnected) {
+      await pool.query(
+        `INSERT INTO messages (application_id, sender_type, sender_name, message_text, is_internal_note)
+         VALUES ((SELECT id FROM applications WHERE id::text = $1 OR application_number = $1 LIMIT 1), 'user', 'مستشار القبول', $2, false)`,
+        [id, messageText]
+      );
+    } else {
+      const app = inMemoryStore.applications.find(a => a.id.toString() === id || a.application_number === id);
+      if (app) {
+        if (!app.messages) app.messages = [];
+        app.messages.push({
+          id: Date.now(),
+          sender_type: 'user',
+          sender_name: 'مستشار القبول',
+          message_text: messageText,
+          is_internal_note: false,
+          sent_at: new Date().toISOString()
+        });
+        saveStoreToDisk();
+      }
+    }
+
+    // إرسال البريد الإلكتروني الفعلي للطالب إذا كانت القناة هي email
+    if (channel === 'email' && studentEmail) {
+      await sendCustomStudentEmailResponse({
+        studentName: studentName || 'عزيزي الطالب',
+        studentEmail,
+        applicationNumber: appNum || id,
+        messageText,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: `تم إرسال الرد بنجاح إلى الطالب (${studentEmail || studentName}) عبر ${channel === 'email' ? 'البريد الإلكتروني' : channel === 'whatsapp' ? 'الواتساب' : 'التلغرام'}`
+    });
+  } catch (error: any) {
+    console.error('Error sending student response:', error);
+    return res.status(500).json({ success: false, error: error.message || 'حدث خطأ في السيرفر أثناء الإرسال' });
   }
 });
 

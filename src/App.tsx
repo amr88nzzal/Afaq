@@ -13,7 +13,9 @@ import { ApplicationModal } from './components/ApplicationModal';
 import { CounselorBookingModal } from './components/CounselorBookingModal';
 import { NotificationToast, NotificationPayload } from './components/NotificationToast';
 import { MOCK_APPLICATIONS, TESTIMONIALS } from './data/mockData';
-import { DestinationCountry, Language, University, Theme, Application } from './types';
+import { DestinationCountry, Language, University, Theme, Application, CountryEntity } from './types';
+import { fetchCountriesAPI } from './services/api';
+import { getCountryFlag, getCountryFallbackImage } from './utils/countryHelper';
 import { 
   Award, 
   ShieldCheck, 
@@ -39,6 +41,58 @@ export default function App() {
   const [activeView, setActiveView] = useState<'home' | 'destinations' | 'universities' | 'student-portal' | 'logo-lab' | 'research' | 'staff-crm'>('home');
   const [selectedDestinationCountry, setSelectedDestinationCountry] = useState<DestinationCountry>('uk');
   const [selectedUniversity, setSelectedUniversity] = useState<University | undefined>(undefined);
+  const [countries, setCountries] = useState<CountryEntity[]>([]);
+
+  const refreshCountries = async () => {
+    try {
+      const data = await fetchCountriesAPI();
+      const list = Array.isArray(data) ? data : ((data as any)?.data || []);
+      setCountries(list);
+    } catch (err) {
+      console.error('Failed to load countries in App', err);
+    }
+  };
+
+  // Load countries from database API on mount
+  useEffect(() => {
+    refreshCountries();
+  }, []);
+
+  // Filter only active countries for public visitor views
+  const activeCountries = countries.length > 0
+    ? countries.filter(c => c.is_active !== false)
+    : [
+        { 
+          id: 1, 
+          code: 'uk', 
+          name_ar: 'المملكة المتحدة (بريطانيا)', 
+          name_en: 'United Kingdom', 
+          image_url: '/images/uk.jpg',
+          info_ar: 'أعرق النظم الأكاديمية عالمياً، دراسة البكالوريوس في 3 سنوات والماجستير في سنة مكثفة مع تأشيرة عمل لمدة سنتين بعد التخرج.',
+          info_en: '3-year Bachelor and 1-year Master with 2-year Graduate Route work visa.',
+          is_active: true
+        },
+        { 
+          id: 2, 
+          code: 'australia', 
+          name_ar: 'أستراليا', 
+          name_en: 'Australia', 
+          image_url: '/images/australia.jpg',
+          info_ar: 'أعلى جودة حياة وتصنيف جامعي، مع تصريح عمل أثناء الدراسة وتأشيرة عمل بعد التخرج تصل إلى 4 سنوات.',
+          info_en: 'Top ranked universities with work rights and post-study visas.',
+          is_active: true
+        },
+        { 
+          id: 3, 
+          code: 'new_zealand', 
+          name_ar: 'نيوزيلندا', 
+          name_en: 'New Zealand', 
+          image_url: '/images/new_zealand.jpg',
+          info_ar: 'جميع جامعات نيوزيلندا مصنفة عالمياً مع بيئة آمنة وترحيب بالطلاب الدوليين.',
+          info_en: 'All NZ universities ranked in the top 3% worldwide with outstanding safety.',
+          is_active: true
+        }
+      ];
   
   // Modals
   const [isApplicationModalOpen, setIsApplicationModalOpen] = useState<boolean>(false);
@@ -197,6 +251,7 @@ export default function App() {
             <HeroSection
               lang={lang}
               theme={theme}
+              countries={activeCountries}
               onOpenApplication={handleOpenApplicationWithCountry}
               onNavigateDestinations={(country) => {
                 if (country) setSelectedDestinationCountry(country);
@@ -247,7 +302,7 @@ export default function App() {
               </div>
             </section>
 
-            {/* 3 Destinations Highlights */}
+            {/* Destinations Highlights (Loaded from Database) */}
             <section className={`py-16 transition-colors duration-200 ${
               isDark ? 'bg-slate-950' : 'bg-slate-50'
             }`}>
@@ -255,7 +310,7 @@ export default function App() {
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 text-start gap-4">
                   <div>
                     <span className="text-xs font-bold text-amber-500 uppercase tracking-wider">
-                      {isAr ? 'الوجهات الثلاث الرئيسية' : 'Premier Global Hubs'}
+                      {isAr ? 'الوجهات الدراسية المعتمدة' : 'Accredited Study Destinations'}
                     </span>
                     <h2 className={`text-2xl sm:text-3xl font-black mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                       {isAr ? 'أين ترغب في بدء رحلتك الجامعية؟' : 'Where Would You Like to Study?'}
@@ -273,160 +328,65 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* UK */}
-                  <div 
-                    onClick={() => {
-                      setSelectedDestinationCountry('uk');
-                      setActiveView('destinations');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className={`border rounded-2xl overflow-hidden hover:border-amber-400/50 transition-all cursor-pointer group shadow-xl flex flex-col justify-between ${
-                      isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 hover:shadow-2xl'
-                    }`}
-                  >
-                    <div>
-                      <div className="relative h-48 overflow-hidden">
-                        <img 
-                          src="/images/uk.jpg" 
-                          alt="UK Campus"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
-                        <span className="absolute top-3 right-3 text-2xl">🇬🇧</span>
-                        <div className="absolute bottom-3 inset-x-3 text-start">
-                          <span className="text-[10px] font-bold text-amber-400 bg-slate-950/80 px-2 py-0.5 rounded">
-                            {isAr ? 'مجموعة راسل (Russell Group)' : 'Russell Group'}
-                          </span>
-                          <h3 className="text-lg font-bold text-white mt-1">
-                            {isAr ? 'المملكة المتحدة (بريطانيا)' : 'United Kingdom'}
-                          </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {activeCountries.map((country) => {
+                    const countryCode = (country.code as DestinationCountry) || 'uk';
+                    const flag = getCountryFlag(country.code);
+                    const heroImg = country.image_url || getCountryFallbackImage(country.code);
+                    const name = isAr ? country.name_ar : country.name_en;
+                    const info = isAr ? (country.info_ar || 'وجهة دراسية رائدة معتمدة رسمياً.') : (country.info_en || 'Top accredited study destination.');
+
+                    return (
+                      <div 
+                        key={country.id || country.code}
+                        onClick={() => {
+                          setSelectedDestinationCountry(countryCode);
+                          setActiveView('destinations');
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className={`border rounded-2xl overflow-hidden hover:border-amber-400/50 transition-all cursor-pointer group shadow-xl flex flex-col justify-between ${
+                          isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 hover:shadow-2xl'
+                        }`}
+                      >
+                        <div>
+                          <div className="relative h-48 overflow-hidden bg-slate-900">
+                            <img 
+                              src={heroImg} 
+                              alt={name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = getCountryFallbackImage(country.code);
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
+                            <span className="absolute top-3 right-3 text-2xl">{flag}</span>
+                            <div className="absolute bottom-3 inset-x-3 text-start">
+                              <span className="text-[10px] font-bold text-amber-400 bg-slate-950/80 px-2 py-0.5 rounded">
+                                {isAr ? 'وجهة معتمدة للابتعاث' : 'Accredited Destination'}
+                              </span>
+                              <h3 className="text-lg font-bold text-white mt-1">
+                                {name}
+                              </h3>
+                            </div>
+                          </div>
+                          <div className="p-5 text-start space-y-2 text-xs">
+                            <p className={`leading-relaxed line-clamp-3 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                              {info}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="p-5 pt-0">
+                          <div className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all text-center flex items-center justify-center gap-1 ${
+                            isDark ? 'bg-slate-800 group-hover:bg-amber-500 group-hover:text-slate-950 text-slate-200' : 'bg-slate-100 group-hover:bg-amber-500 group-hover:text-slate-950 text-slate-700'
+                          }`}>
+                            <span>{isAr ? 'تفاصيل شروط القبول والتأشيرة' : 'Admission & Visa Guide'}</span>
+                            <ArrowIcon className="w-3.5 h-3.5" />
+                          </div>
                         </div>
                       </div>
-                      <div className="p-5 text-start space-y-2 text-xs">
-                        <p className={`leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                          {isAr 
-                            ? 'أعرق النظم الأكاديمية عالمياً، دراسة البكالوريوس في 3 سنوات والماجستير في سنة مكثفة مع تأشيرة عمل لمدة سنتين بعد التخرج.'
-                            : '3-year Bachelor and 1-year Master with 2-year Graduate Route work visa.'}
-                        </p>
-                        <div className="text-[11px] text-amber-500 pt-2 font-semibold">
-                          {isAr ? '✓ لندن، مانشستر، برمنجهام، ليدز، بريستول' : '✓ London, Manchester, Leeds, Bristol'}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-5 pt-0">
-                      <div className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all text-center flex items-center justify-center gap-1 ${
-                        isDark ? 'bg-slate-800 group-hover:bg-amber-500 group-hover:text-slate-950 text-slate-200' : 'bg-slate-100 group-hover:bg-amber-500 group-hover:text-slate-950 text-slate-700'
-                      }`}>
-                        <span>{isAr ? 'تفاصيل شروط القبول والتأشيرة' : 'Admission & Visa Guide'}</span>
-                        <ArrowIcon className="w-3.5 h-3.5" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Australia */}
-                  <div 
-                    onClick={() => {
-                      setSelectedDestinationCountry('australia');
-                      setActiveView('destinations');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className={`border rounded-2xl overflow-hidden hover:border-amber-400/50 transition-all cursor-pointer group shadow-xl flex flex-col justify-between ${
-                      isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 hover:shadow-2xl'
-                    }`}
-                  >
-                    <div>
-                      <div className="relative h-48 overflow-hidden">
-                        <img 
-                          src="/images/australia.jpg" 
-                          alt="Australia Campus"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
-                        <span className="absolute top-3 right-3 text-2xl">🇦🇺</span>
-                        <div className="absolute bottom-3 inset-x-3 text-start">
-                          <span className="text-[10px] font-bold text-amber-400 bg-slate-950/80 px-2 py-0.5 rounded">
-                            {isAr ? 'مجموعة الثمانية (Group of Eight)' : 'Go8 Universities'}
-                          </span>
-                          <h3 className="text-lg font-bold text-white mt-1">
-                            {isAr ? 'أستراليا' : 'Australia'}
-                          </h3>
-                        </div>
-                      </div>
-                      <div className="p-5 text-start space-y-2 text-xs">
-                        <p className={`leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                          {isAr 
-                            ? 'أعلى جودة حياة وتصنيف جامعي (7 جامعات ضمن أفضل 50 عالمياً)، مع تصريح عمل 48 ساعة كل أسبوعين وتأشيرة عمل بعد التخرج تصل إلى 4 سنوات.'
-                            : '7 universities in global top 50, 48h work rights fortnightly, and 3-4 year 485 post-study visas.'}
-                        </p>
-                        <div className="text-[11px] text-amber-500 pt-2 font-semibold">
-                          {isAr ? '✓ سيدني، ملبورن، بريزبن، أديلايد، بيرث' : '✓ Sydney, Melbourne, Brisbane, Perth'}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-5 pt-0">
-                      <div className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all text-center flex items-center justify-center gap-1 ${
-                        isDark ? 'bg-slate-800 group-hover:bg-amber-500 group-hover:text-slate-950 text-slate-200' : 'bg-slate-100 group-hover:bg-amber-500 group-hover:text-slate-950 text-slate-700'
-                      }`}>
-                        <span>{isAr ? 'تفاصيل شروط القبول والتأشيرة' : 'Admission & Visa Guide'}</span>
-                        <ArrowIcon className="w-3.5 h-3.5" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* New Zealand */}
-                  <div 
-                    onClick={() => {
-                      setSelectedDestinationCountry('new_zealand');
-                      setActiveView('destinations');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className={`border rounded-2xl overflow-hidden hover:border-amber-400/50 transition-all cursor-pointer group shadow-xl flex flex-col justify-between ${
-                      isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 hover:shadow-2xl'
-                    }`}
-                  >
-                    <div>
-                      <div className="relative h-48 overflow-hidden">
-                        <img 
-                          src="/images/new_zealand.jpg" 
-                          alt="New Zealand Campus"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
-                        <span className="absolute top-3 right-3 text-2xl">🇳🇿</span>
-                        <div className="absolute bottom-3 inset-x-3 text-start">
-                          <span className="text-[10px] font-bold text-amber-400 bg-slate-950/80 px-2 py-0.5 rounded">
-                            {isAr ? 'البيئة الأكثر أماناً وطبيعة خلابة' : 'Safest Student Environment'}
-                          </span>
-                          <h3 className="text-lg font-bold text-white mt-1">
-                            {isAr ? 'نيوزيلندا' : 'New Zealand'}
-                          </h3>
-                        </div>
-                      </div>
-                      <div className="p-5 text-start space-y-2 text-xs">
-                        <p className={`leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                          {isAr 
-                            ? 'جميع جامعات نيوزيلندا مصنفة ضمن أفضل 3% عالمياً، وتكاليف معيشية منافسة وترحيب استثنائي بالطلاب الدوليين وعائلاتهم.'
-                            : 'All 8 NZ universities ranked in the top 3% worldwide with outstanding safety index.'}
-                        </p>
-                        <div className="text-[11px] text-amber-500 pt-2 font-semibold">
-                          {isAr ? '✓ أوكلاند، ويلينغتون، كرايستشيرش، أوتاجو' : '✓ Auckland, Wellington, Otago'}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-5 pt-0">
-                      <div className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all text-center flex items-center justify-center gap-1 ${
-                        isDark ? 'bg-slate-800 group-hover:bg-amber-500 group-hover:text-slate-950 text-slate-200' : 'bg-slate-100 group-hover:bg-amber-500 group-hover:text-slate-950 text-slate-700'
-                      }`}>
-                        <span>{isAr ? 'تفاصيل شروط القبول والتأشيرة' : 'Admission & Visa Guide'}</span>
-                        <ArrowIcon className="w-3.5 h-3.5" />
-                      </div>
-                    </div>
-                  </div>
-
+                    );
+                  })}
                 </div>
               </div>
             </section>
@@ -639,6 +599,7 @@ export default function App() {
           <DestinationsSection
             lang={lang}
             theme={theme}
+            countries={activeCountries}
             initialSelectedCountry={selectedDestinationCountry}
             onApplyForCountry={(country) => handleOpenApplicationWithCountry(country)}
           />
@@ -684,6 +645,7 @@ export default function App() {
             theme={theme}
             onToggleTheme={handleToggleTheme}
             onToggleLang={handleToggleLang}
+            onCountriesUpdated={refreshCountries}
             onReturnToPublicSite={() => {
               window.location.hash = '';
               setActiveView('home');

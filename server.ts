@@ -2,11 +2,6 @@
  * ============================================================================
  * خادم الويب والتطبيق المدمج (Afaq Global Express + Vite Full-Stack Server)
  * ============================================================================
- * هذا هو المدخل الرئيسي لخادم Node.js + Express:
- * 1. يوفر مسارات RESTful API على البادئة /api/
- * 2. يدمج Vite كـ Middleware في وضع التطوير لخدمة واجهة React فورياً.
- * 3. يخدم ملفات الإنتاج المجمعة (Production Dist) عند النشر.
- * 4. يربط قواعد البيانات ويشغل خدمات البريد وتلغرام بسلاسة.
  */
 
 import express from 'express';
@@ -16,16 +11,23 @@ import { testDbConnection, isPostgresConnected } from './server/db';
 import settingsRoutes from './server/routes/settingsRoutes';
 import universitiesRoutes from './server/routes/universitiesRoutes';
 import applicationsRoutes from './server/routes/applicationsRoutes';
+import countriesRoutes from './server/routes/countriesRoutes';
+import majorsRoutes from './server/routes/majorsRoutes';
+import usersRoutes from './server/routes/usersRoutes';
+import customersRoutes from './server/routes/customersRoutes';
+import meetingsRoutes from './server/routes/meetingsRoutes';
+import paragraphsRoutes from './server/routes/paragraphsRoutes';
+import messagesRoutes from './server/routes/messagesRoutes';
 
 async function startServer() {
   const app = express();
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   // قراءة مدخلات الـ JSON والنماذج في الطلبات
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  app.use(express.json({ limit: '15mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
-  // فحص الاتصال بقاعدة بيانات PostgreSQL عند الإقلاع
+  // فحص الاتصال بقاعدة بيانات PostgreSQL عند الإقلاع وتأسيس المخطط
   await testDbConnection();
 
   // --------------------------------------------------------------------------
@@ -41,14 +43,17 @@ async function startServer() {
     });
   });
 
-  // مسار إعدادات ومعطيات الموقع (هواتف، بريد، عناوين، نصوص)
+  // مسارات الجداول الأساسية
   app.use('/api/settings', settingsRoutes);
-
-  // مسار الجامعات والوجهات الأكاديمية
+  app.use('/api/countries', countriesRoutes);
   app.use('/api/universities', universitiesRoutes);
-
-  // مسار طلبات القبول والطلاب وبوابة المتابعة
+  app.use('/api/majors', majorsRoutes);
+  app.use('/api/users', usersRoutes);
+  app.use('/api/customers', customersRoutes);
   app.use('/api/applications', applicationsRoutes);
+  app.use('/api/meetings', meetingsRoutes);
+  app.use('/api/paragraphs', paragraphsRoutes);
+  app.use('/api/messages', messagesRoutes);
 
   // --------------------------------------------------------------------------
   // خدمة الملفات الثابتة والصور الرسمية (Public Static Assets & Images)

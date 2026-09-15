@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DESTINATION_DETAILS } from '../data/mockData';
-import { Language, DestinationCountry, Theme } from '../types';
+import { Language, DestinationCountry, Theme, CountryEntity } from '../types';
+import { fetchCountriesAPI, fetchUniversitiesAPI } from '../services/api';
+import { getCountryFlag, getCountryFallbackImage } from '../utils/countryHelper';
 import { 
   Building2, 
   Coins, 
@@ -8,9 +10,10 @@ import {
   Briefcase, 
   CheckCircle2, 
   ArrowLeft, 
-  ArrowRight,
-  PlaneTakeoff,
-  FileText
+  ArrowRight, 
+  PlaneTakeoff, 
+  FileText,
+  Sparkles
 } from 'lucide-react';
 
 interface DestinationsSectionProps {
@@ -18,6 +21,7 @@ interface DestinationsSectionProps {
   theme?: Theme;
   onApplyForCountry: (country: DestinationCountry) => void;
   initialSelectedCountry?: DestinationCountry;
+  countries?: CountryEntity[];
 }
 
 export const DestinationsSection: React.FC<DestinationsSectionProps> = ({
@@ -25,13 +29,55 @@ export const DestinationsSection: React.FC<DestinationsSectionProps> = ({
   theme = 'dark',
   onApplyForCountry,
   initialSelectedCountry = 'uk',
+  countries: propCountries,
 }) => {
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
   const ArrowIcon = isAr ? ArrowLeft : ArrowRight;
-  const [activeCountry, setActiveCountry] = useState<DestinationCountry>(initialSelectedCountry);
 
-  const countryData = DESTINATION_DETAILS[activeCountry];
+  const [countries, setCountries] = useState<CountryEntity[]>(
+    propCountries ? propCountries.filter(c => c.is_active !== false) : []
+  );
+  const [activeCountryCode, setActiveCountryCode] = useState<string>(initialSelectedCountry);
+  const [activeCountryId, setActiveCountryId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (propCountries && propCountries.length > 0) {
+      const activeList = propCountries.filter(c => c.is_active !== false);
+      setCountries(activeList);
+      const match = activeList.find(c => c.code === initialSelectedCountry) || activeList[0];
+      if (match) {
+        setActiveCountryCode(match.code);
+        setActiveCountryId(match.id);
+      }
+    } else {
+      fetchCountriesAPI().then(data => {
+        const list = Array.isArray(data) ? data : ((data as any)?.data || []);
+        const activeList = list.filter(c => c.is_active !== false);
+        if (activeList.length > 0) {
+          setCountries(activeList);
+          const match = activeList.find(c => c.code === initialSelectedCountry) || activeList[0];
+          if (match) {
+            setActiveCountryCode(match.code);
+            setActiveCountryId(match.id);
+          }
+        }
+      }).catch(err => console.error('Failed to load countries', err));
+    }
+  }, [propCountries, initialSelectedCountry]);
+
+  // Current active country entity from DB
+  const currentDbCountry = countries.find(c => c.code === activeCountryCode) || countries[0];
+  
+  // Static mockData fallback details if available for uk/australia/new_zealand
+  const staticData = DESTINATION_DETAILS[activeCountryCode as DestinationCountry] || DESTINATION_DETAILS['uk'];
+
+  const heroImg = currentDbCountry?.image_url || staticData?.heroImage || getCountryFallbackImage(activeCountryCode);
+  const countryNameAr = currentDbCountry?.name_ar || staticData?.nameAr || 'الوجهة الدراسية';
+  const countryNameEn = currentDbCountry?.name_en || staticData?.nameEn || 'Study Destination';
+  const countryInfoAr = currentDbCountry?.info_ar || staticData?.taglineAr || 'وجهة أكاديمية مميزة معتمدة رسمياً.';
+  const countryInfoEn = currentDbCountry?.info_en || staticData?.taglineEn || 'Premier study destination with world-class universities.';
+  const flag = getCountryFlag(activeCountryCode);
 
   return (
     <section className={`py-16 transition-colors duration-200 ${
@@ -46,58 +92,40 @@ export const DestinationsSection: React.FC<DestinationsSectionProps> = ({
             <span>{isAr ? 'الوجهات الدراسية العالمية المعتمدة' : 'Accredited Global Study Destinations'}</span>
           </div>
           <h2 className={`text-3xl sm:text-4xl font-black ${isDark ? 'text-white' : 'text-slate-950'}`}>
-            {isAr ? 'اختر وجهتك الأكاديمية: بريطانيا، أستراليا، ونيوزيلندا' : 'Study in the UK, Australia & New Zealand'}
+            {isAr ? 'استكشف وجهتك الأكاديمية حول العالم' : 'Explore Global Study Destinations'}
           </h2>
           <p className={`text-sm sm:text-base leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
             {isAr 
-              ? 'وجهات تجمع بين جودة التعليم المصنف عالمياً، والأمان العالي، وفرص العمل أثناء وبعد التخرج، مع اعتماد رسمي كامل في كافة برامج الابتعاث الحكومي بدول الخليج.'
+              ? 'وجهات معتمدة رسمياً تجمع بين جودة التعليم المصنف عالمياً، والأمان، وتأشيرات العمل بعد التخرج، مع توافق كامل مع برامج الابتعاث الحكومي.'
               : 'World-renowned academic hubs offering post-study work visas, top safety ratings, and full GCC ministry accreditations.'}
           </p>
         </div>
 
-        {/* Destination Country Buttons */}
+        {/* Destination Country Buttons (Loaded dynamically from Database) */}
         <div className="flex flex-wrap justify-center gap-3 mb-10">
-          <button
-            onClick={() => setActiveCountry('uk')}
-            className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all flex items-center gap-2.5 border cursor-pointer ${
-              activeCountry === 'uk'
-                ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/20'
-                : isDark 
-                  ? 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800' 
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 shadow-sm'
-            }`}
-          >
-            <span className="text-xl">🇬🇧</span>
-            <span>{isAr ? 'المملكة المتحدة (بريطانيا)' : 'United Kingdom'}</span>
-          </button>
-
-          <button
-            onClick={() => setActiveCountry('australia')}
-            className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all flex items-center gap-2.5 border cursor-pointer ${
-              activeCountry === 'australia'
-                ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/20'
-                : isDark 
-                  ? 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800' 
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 shadow-sm'
-            }`}
-          >
-            <span className="text-xl">🇦🇺</span>
-            <span>{isAr ? 'أستراليا (Group of Eight)' : 'Australia (Go8)'}</span>
-          </button>
-
-          <button
-            onClick={() => setActiveCountry('new_zealand')}
-            className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all flex items-center gap-2.5 border cursor-pointer ${
-              activeCountry === 'new_zealand'
-                ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/20'
-                : isDark 
-                  ? 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800' 
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 shadow-sm'
-            }`}
-          >
-            <span className="text-xl">🇳🇿</span>
-            <span>{isAr ? 'نيوزيلندا (أعلى درجات الأمان)' : 'New Zealand'}</span>
-          </button>
+          {countries.map((c) => {
+            const isSelected = activeCountryCode === c.code;
+            const cFlag = getCountryFlag(c.code);
+            return (
+              <button
+                key={c.id || c.code}
+                onClick={() => {
+                  setActiveCountryCode(c.code);
+                  setActiveCountryId(c.id);
+                }}
+                className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all flex items-center gap-2.5 border cursor-pointer ${
+                  isSelected
+                    ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/20'
+                    : isDark 
+                      ? 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800' 
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 shadow-sm'
+                }`}
+              >
+                <span className="text-xl">{cFlag}</span>
+                <span>{isAr ? c.name_ar : c.name_en}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Selected Country Spotlight Card */}
@@ -109,16 +137,12 @@ export const DestinationsSection: React.FC<DestinationsSectionProps> = ({
             {/* Country Visual & Key Overview (5 cols) */}
             <div className="lg:col-span-5 relative min-h-[350px] lg:min-h-full">
               <img 
-                src={countryData.heroImage} 
-                alt={countryData.nameAr}
+                src={heroImg} 
+                alt={countryNameAr}
                 className="w-full h-full object-cover object-center"
                 onError={(e) => {
                   const target = e.currentTarget;
-                  const fallback = activeCountry === 'uk'
-                    ? 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=800&auto=format&fit=crop&q=80'
-                    : activeCountry === 'australia'
-                    ? 'https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?w=800&auto=format&fit=crop&q=80'
-                    : 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800&auto=format&fit=crop&q=80';
+                  const fallback = getCountryFallbackImage(activeCountryCode);
                   if (target.src !== fallback) {
                     target.src = fallback;
                   }
@@ -128,16 +152,16 @@ export const DestinationsSection: React.FC<DestinationsSectionProps> = ({
               
               <div className="absolute bottom-6 inset-x-6 space-y-2 text-start">
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl">{countryData.flag}</span>
+                  <span className="text-2xl">{flag}</span>
                   <span className="text-xs font-bold uppercase tracking-wider text-amber-300">
-                    {isAr ? 'وجهة تعليمية مميزة' : 'Top Study Destination'}
+                    {isAr ? 'وجهة تعليمية معتمدة' : 'Accredited Study Destination'}
                   </span>
                 </div>
                 <h3 className="text-2xl sm:text-3xl font-black text-white">
-                  {isAr ? countryData.nameAr : countryData.nameEn}
+                  {isAr ? countryNameAr : countryNameEn}
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-200 line-clamp-2">
-                  {isAr ? countryData.taglineAr : countryData.taglineEn}
+                <p className="text-xs sm:text-sm text-slate-200 line-clamp-3 leading-relaxed">
+                  {isAr ? countryInfoAr : countryInfoEn}
                 </p>
               </div>
             </div>
@@ -155,7 +179,7 @@ export const DestinationsSection: React.FC<DestinationsSectionProps> = ({
                     <span>{isAr ? 'تكاليف الدراسة التقريبية' : 'Tuition Estimate'}</span>
                   </div>
                   <div className={`text-xs sm:text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                    {countryData.costEstimates.tuition}
+                    {staticData?.costEstimates?.tuition || (isAr ? 'من 12,000 إلى 28,000 $ سنوي' : '$12,000 - $28,000 / yr')}
                   </div>
                 </div>
 
@@ -167,7 +191,7 @@ export const DestinationsSection: React.FC<DestinationsSectionProps> = ({
                     <span>{isAr ? 'المعيشة والسكن' : 'Living Expenses'}</span>
                   </div>
                   <div className={`text-xs sm:text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                    {countryData.costEstimates.living}
+                    {staticData?.costEstimates?.living || (isAr ? '1,000 - 1,600 $ شهرياً' : '$1,000 - $1,600 / mo')}
                   </div>
                 </div>
 
@@ -179,7 +203,10 @@ export const DestinationsSection: React.FC<DestinationsSectionProps> = ({
                     <span>{isAr ? 'تأشيرة العمل بعد التخرج' : 'Post-Study Visa'}</span>
                   </div>
                   <div className="text-xs sm:text-sm font-bold text-emerald-500">
-                    {activeCountry === 'uk' ? 'سنتين (Graduate Route)' : activeCountry === 'australia' ? 'حتى 3-4 سنوات (485)' : 'حتى 3 سنوات عمل'}
+                    {activeCountryCode === 'uk' ? (isAr ? 'سنتين (Graduate Route)' : '2 Years (Graduate Route)') :
+                     activeCountryCode === 'australia' ? (isAr ? 'حتى 3-4 سنوات (485)' : '3-4 Years (485 Visa)') :
+                     activeCountryCode === 'new_zealand' ? (isAr ? 'حتى 3 سنوات عمل' : 'Up to 3 Years') :
+                     (isAr ? 'متاحة وفق القوانين الرسمية' : 'Available post-graduation')}
                   </div>
                 </div>
               </div>
@@ -191,7 +218,12 @@ export const DestinationsSection: React.FC<DestinationsSectionProps> = ({
                   <span>{isAr ? 'أهم مزايا الدراسة في هذه الوجهة:' : 'Key Advantages:'}</span>
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {countryData.keyPointsAr.map((point, idx) => (
+                  {(staticData?.keyPointsAr && isAr ? staticData.keyPointsAr : [
+                    isAr ? 'شهادات جامعية معترف بها عالمياً ومن وزارات التعليم العالي الخليجية' : 'Internationally accredited degree programs',
+                    isAr ? 'بيئة آمنة ومتعددة الثقافات مع دعم شامل للطلاب الدوليين' : 'Safe multicultural environment with full student support',
+                    isAr ? 'إمكانية العمل بدوام جزئي أثناء فترة الدراسة' : 'Part-time work rights during study terms',
+                    isAr ? 'مسارات سريعة للقبول والفيزا الدراسية' : 'Fast-track admissions and visa processing'
+                  ]).map((point, idx) => (
                     <div key={idx} className={`flex items-start gap-2 p-2.5 rounded-xl text-xs ${
                       isDark ? 'bg-slate-800/40 text-slate-200' : 'bg-slate-100 text-slate-800'
                     }`}>
@@ -209,7 +241,12 @@ export const DestinationsSection: React.FC<DestinationsSectionProps> = ({
                   <span>{isAr ? 'المتطلبات الأساسية للقبول في هذه الدولة:' : 'General Admission Requirements:'}</span>
                 </h4>
                 <div className="flex flex-wrap gap-2 text-[11px]">
-                  {countryData.admissionRequirementsAr.map((req, idx) => (
+                  {(staticData?.admissionRequirementsAr && isAr ? staticData.admissionRequirementsAr : [
+                    isAr ? 'الشهادة الثانوية أو البكالوريوس وكشف الدرجات' : 'Academic transcripts & certificate',
+                    isAr ? 'شهادة إجادة اللغة الإنجليزية (IELTS / TOEFL / Duolingo)' : 'English Proficiency (IELTS/TOEFL)',
+                    isAr ? 'جواز سفر ساري المفعول لمدة لا تقل عن 6 أشهر' : 'Valid Passport (min 6 months validity)',
+                    isAr ? 'السيرة الذاتية وخطاب الغرض من الدراسة (Statement of Purpose)' : 'CV and Statement of Purpose'
+                  ]).map((req, idx) => (
                     <span key={idx} className={`px-2.5 py-1 rounded-lg border ${
                       isDark ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-200'
                     }`}>
@@ -217,18 +254,6 @@ export const DestinationsSection: React.FC<DestinationsSectionProps> = ({
                     </span>
                   ))}
                 </div>
-              </div>
-
-              {/* Cities */}
-              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 pt-1">
-                <span>{isAr ? 'أشهر المدن الجامعية:' : 'Top Cities:'}</span>
-                {countryData.popularCitiesAr.map((city, idx) => (
-                  <span key={idx} className={`px-2.5 py-0.5 rounded-md font-semibold text-[11px] ${
-                    isDark ? 'bg-slate-800 text-amber-300' : 'bg-amber-50 text-amber-700 border border-amber-200'
-                  }`}>
-                    {city}
-                  </span>
-                ))}
               </div>
 
               {/* Bottom CTA */}
@@ -240,11 +265,11 @@ export const DestinationsSection: React.FC<DestinationsSectionProps> = ({
                   <span>{isAr ? 'خدمة تأمين القبول مجانية 100%' : '100% Free Placement'}</span>
                 </div>
                 <button
-                  onClick={() => onApplyForCountry(activeCountry)}
+                  onClick={() => onApplyForCountry((activeCountryCode as DestinationCountry) || 'uk')}
                   className="w-full sm:w-auto px-6 py-3 rounded-xl font-black text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center gap-2 shadow cursor-pointer transition-all active:scale-95"
                 >
                   <GraduationCap className="w-4 h-4" />
-                  <span>{isAr ? `تقديم طلب قبول مجاني في ${countryData.nameAr}` : `Apply Free to ${countryData.nameEn}`}</span>
+                  <span>{isAr ? `تقديم طلب قبول مجاني في ${countryNameAr}` : `Apply Free to ${countryNameEn}`}</span>
                   <ArrowIcon className="w-3.5 h-3.5" />
                 </button>
               </div>

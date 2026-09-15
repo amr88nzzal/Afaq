@@ -2,13 +2,18 @@
  * ============================================================================
  * عميل الاتصال بواجهات الـ API (Afaq Frontend API Client)
  * ============================================================================
- * يوفر دوال قياسية ومبسطة للاتصال بخادم Express و PostgreSQL:
- * 1. جلب وتحديث إعدادات ومعطيات الموقع.
- * 2. إرسال واستعلام طلبات القبول والتسجيل.
- * 3. جلب قائمة الجامعات المعتمدة.
  */
 
-import { Application, University } from '../types';
+import { 
+  Application, 
+  CountryEntity, 
+  UniversityEntity, 
+  MajorEntity, 
+  StaffUserEntity, 
+  CustomerEntity, 
+  MeetingEntity, 
+  CMSParagraphEntity 
+} from '../types';
 
 export interface SiteSettings {
   company_name_ar: string;
@@ -54,9 +59,10 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   telegram_chat_id: '',
 };
 
-/**
- * جلب إعدادات الموقع الديناميكية من السيرفر
- */
+// ==========================================
+// 1. إعدادات المنصة وقاعدة البيانات
+// ==========================================
+
 export async function getSiteSettings(): Promise<{ settings: SiteSettings; source: string }> {
   try {
     const res = await fetch('/api/settings');
@@ -67,14 +73,10 @@ export async function getSiteSettings(): Promise<{ settings: SiteSettings; sourc
       source: json.source || 'default',
     };
   } catch (err) {
-    console.warn('⚠️ [API Client] استخدم الإعدادات الافتراضية نظراً لتعذر الاتصال بـ /api/settings:', err);
     return { settings: DEFAULT_SETTINGS, source: 'offline-fallback' };
   }
 }
 
-/**
- * تحديث إعدادات الموقع (من لوحة تحكم المشرف)
- */
 export async function updateSiteSettings(updates: Partial<SiteSettings>): Promise<boolean> {
   try {
     const res = await fetch('/api/settings', {
@@ -85,94 +87,10 @@ export async function updateSiteSettings(updates: Partial<SiteSettings>): Promis
     const json = await res.json();
     return json.success === true;
   } catch (err) {
-    console.error('❌ [API Client] فشل تحديث الإعدادات:', err);
     return false;
   }
 }
 
-/**
- * إرسال طلب قبول جامعي جديد إلى خادم الباك إند
- */
-export async function submitApplicationAPI(formData: any): Promise<{ success: boolean; applicationNumber: string; data?: Application; error?: string }> {
-  try {
-    const res = await fetch('/api/applications', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData),
-    });
-    const json = await res.json();
-    if (!res.ok) {
-      throw new Error(json.error || 'فشل إرسال الطلب');
-    }
-    return {
-      success: true,
-      applicationNumber: json.applicationNumber,
-      data: json.data,
-    };
-  } catch (err: any) {
-    console.error('❌ [API Client] خطأ في تقديم الطلب:', err.message);
-    return {
-      success: false,
-      applicationNumber: `AFQ-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-      error: err.message,
-    };
-  }
-}
-
-/**
- * جلب جميع طلبات القبول للمشرفين
- */
-export async function fetchApplicationsAPI(): Promise<Application[]> {
-  try {
-    const res = await fetch('/api/applications');
-    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-    const json = await res.json();
-    return json.data || [];
-  } catch (err) {
-    console.warn('⚠️ [API Client] تعذر جلب الطلبات من السيرفر:', err);
-    return [];
-  }
-}
-
-/**
- * تحديث حالة طلب معين
- */
-export async function updateApplicationStatusAPI(id: string, status: string, stageIndex?: number, note?: string): Promise<boolean> {
-  try {
-    const res = await fetch(`/api/applications/${id}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, stageIndex, note }),
-    });
-    const json = await res.json();
-    return json.success === true;
-  } catch (err) {
-    console.error('❌ [API Client] خطأ في تحديث حالة الطلب:', err);
-    return false;
-  }
-}
-
-/**
- * تحديث وتخزين بيانات الطلب الكاملة في قاعدة بيانات PostgreSQL
- */
-export async function updateApplicationFullAPI(id: string, updates: Partial<Application>): Promise<{ success: boolean; data?: Application }> {
-  try {
-    const res = await fetch(`/api/applications/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates),
-    });
-    const json = await res.json();
-    return { success: json.success === true, data: json.data };
-  } catch (err) {
-    console.error('❌ [API Client] خطأ في حفظ بيانات الطلب:', err);
-    return { success: false };
-  }
-}
-
-/**
- * فحص صحة اتصال السيرفر وقاعدة البيانات
- */
 export async function checkServerHealthAPI(): Promise<{ ok: boolean; postgres: boolean }> {
   try {
     const res = await fetch('/api/health');
@@ -184,9 +102,379 @@ export async function checkServerHealthAPI(): Promise<{ ok: boolean; postgres: b
   }
 }
 
-/**
- * تسجيل دخول بوابة الطالب المخصصة
- */
+// ==========================================
+// 2. إدارة الدول والوجهات الدراسية (Countries)
+// ==========================================
+
+export async function fetchCountriesAPI(): Promise<CountryEntity[]> {
+  try {
+    const res = await fetch('/api/countries');
+    const json = await res.json();
+    return json.data || [];
+  } catch (err) {
+    console.error('Error fetching countries:', err);
+    return [];
+  }
+}
+
+export async function createCountryAPI(data: Partial<CountryEntity>): Promise<{ success: boolean; data?: CountryEntity; error?: string }> {
+  try {
+    const res = await fetch('/api/countries', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    return json;
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function updateCountryAPI(id: number, data: Partial<CountryEntity>): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`/api/countries/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    return json;
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function deleteCountryAPI(id: number): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/countries/${id}`, { method: 'DELETE' });
+    const json = await res.json();
+    return json.success === true;
+  } catch {
+    return false;
+  }
+}
+
+// ==========================================
+// 3. إدارة الجامعات (Universities)
+// ==========================================
+
+export async function fetchUniversitiesAPI(countryId?: number): Promise<UniversityEntity[]> {
+  try {
+    const url = countryId ? `/api/universities?country_id=${countryId}` : '/api/universities';
+    const res = await fetch(url);
+    const json = await res.json();
+    return json.data || [];
+  } catch (err) {
+    console.error('Error fetching universities:', err);
+    return [];
+  }
+}
+
+export async function createUniversityAPI(data: Partial<UniversityEntity>): Promise<{ success: boolean; data?: UniversityEntity; error?: string }> {
+  try {
+    const res = await fetch('/api/universities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    return json;
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function updateUniversityAPI(id: number, data: Partial<UniversityEntity>): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`/api/universities/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    return json;
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function deleteUniversityAPI(id: number): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/universities/${id}`, { method: 'DELETE' });
+    const json = await res.json();
+    return json.success === true;
+  } catch {
+    return false;
+  }
+}
+
+// ==========================================
+// 4. إدارة التخصصات (Majors)
+// ==========================================
+
+export async function fetchMajorsAPI(universityId?: number): Promise<MajorEntity[]> {
+  try {
+    const url = universityId ? `/api/majors?university_id=${universityId}` : '/api/majors';
+    const res = await fetch(url);
+    const json = await res.json();
+    return json.data || [];
+  } catch (err) {
+    console.error('Error fetching majors:', err);
+    return [];
+  }
+}
+
+export async function createMajorAPI(data: Partial<MajorEntity>): Promise<{ success: boolean; data?: MajorEntity; error?: string }> {
+  try {
+    const res = await fetch('/api/majors', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    return json;
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function updateMajorAPI(id: number, data: Partial<MajorEntity>): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`/api/majors/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    return json;
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function deleteMajorAPI(id: number): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/majors/${id}`, { method: 'DELETE' });
+    const json = await res.json();
+    return json.success === true;
+  } catch {
+    return false;
+  }
+}
+
+// ==========================================
+// 5. إدارة الموظفين والمستشارين (Staff / Users)
+// ==========================================
+
+export async function fetchStaffUsersAPI(): Promise<StaffUserEntity[]> {
+  try {
+    const res = await fetch('/api/users');
+    const json = await res.json();
+    return json.data || [];
+  } catch (err) {
+    return [];
+  }
+}
+
+export async function createStaffUserAPI(data: any): Promise<{ success: boolean; data?: StaffUserEntity; error?: string }> {
+  try {
+    const res = await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function updateStaffUserAPI(id: number, data: any): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`/api/users/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function deleteStaffUserAPI(id: number): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+    const json = await res.json();
+    return json.success === true;
+  } catch {
+    return false;
+  }
+}
+
+// ==========================================
+// 6. إدارة الطلاب (Customers)
+// ==========================================
+
+export async function fetchCustomersAPI(): Promise<CustomerEntity[]> {
+  try {
+    const res = await fetch('/api/customers');
+    const json = await res.json();
+    return json.data || [];
+  } catch (err) {
+    return [];
+  }
+}
+
+// ==========================================
+// 7. إدارة المواعيد والاستشارات (Meetings)
+// ==========================================
+
+export async function fetchMeetingsAPI(): Promise<MeetingEntity[]> {
+  try {
+    const res = await fetch('/api/meetings');
+    const json = await res.json();
+    return json.data || [];
+  } catch (err) {
+    return [];
+  }
+}
+
+export async function bookMeetingAPI(data: Partial<MeetingEntity>): Promise<{ success: boolean; message?: string; data?: MeetingEntity; error?: string }> {
+  try {
+    const res = await fetch('/api/meetings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function updateMeetingAPI(id: number, data: Partial<MeetingEntity>): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`/api/meetings/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+// ==========================================
+// 8. إدارة محتوى ونصوص الموقع (CMS Paragraphs)
+// ==========================================
+
+export async function fetchCMSParagraphsAPI(): Promise<CMSParagraphEntity[]> {
+  try {
+    const res = await fetch('/api/paragraphs');
+    const json = await res.json();
+    return json.data || [];
+  } catch (err) {
+    return [];
+  }
+}
+
+export async function updateCMSParagraphAPI(slug: string, data: Partial<CMSParagraphEntity>): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`/api/paragraphs/${slug}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+// ==========================================
+// 9. طلبات القبول والطلاب (Applications)
+// ==========================================
+
+export async function fetchApplicationsAPI(): Promise<Application[]> {
+  try {
+    const res = await fetch('/api/applications');
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    const json = await res.json();
+    return json.data || [];
+  } catch (err) {
+    console.warn('تعذر جلب الطلبات من السيرفر:', err);
+    return [];
+  }
+}
+
+export async function submitApplicationAPI(formData: any): Promise<{ success: boolean; applicationNumber: string; data?: Application; error?: string }> {
+  try {
+    const res = await fetch('/api/applications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'فشل إرسال الطلب');
+    return {
+      success: true,
+      applicationNumber: json.applicationNumber,
+      data: json.data,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      applicationNumber: `AFQ-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+      error: err.message,
+    };
+  }
+}
+
+export async function updateApplicationFullAPI(appId: string, updates: Partial<Application>): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/applications/${appId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    const json = await res.json();
+    return json.success === true;
+  } catch {
+    return false;
+  }
+}
+
+export async function updateApplicationStatusAPI(id: string, status: string, stageOrder?: number, note?: string, staffId?: number): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/applications/${id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, note, stageOrder, staffId }),
+    });
+    const json = await res.json();
+    return json.success === true;
+  } catch (err) {
+    return false;
+  }
+}
+
+export async function updateDocumentStatusAPI(appId: string, docId: number | string, status: string, feedback?: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/applications/${appId}/documents/${docId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, feedback }),
+    });
+    const json = await res.json();
+    return json.success === true;
+  } catch {
+    return false;
+  }
+}
+
 export async function studentPortalLoginAPI(loginId: string, password: string): Promise<{ success: boolean; data?: Application; error?: string }> {
   try {
     const res = await fetch('/api/applications/portal-login', {
@@ -195,18 +483,13 @@ export async function studentPortalLoginAPI(loginId: string, password: string): 
       body: JSON.stringify({ loginId, password }),
     });
     const json = await res.json();
-    if (!res.ok) {
-      return { success: false, error: json.error || 'فشل تسجيل الدخول' };
-    }
+    if (!res.ok) return { success: false, error: json.error || 'فشل تسجيل الدخول' };
     return { success: true, data: json.data };
   } catch (err: any) {
     return { success: false, error: err.message || 'تعذر الاتصال بالخادم' };
   }
 }
 
-/**
- * تحديث كلمة مرور الطالب من قبل المشرف
- */
 export async function updatePortalPasswordAPI(appId: string, newPassword: string): Promise<{ success: boolean; message?: string }> {
   try {
     const res = await fetch(`/api/applications/${appId}/portal-password`, {
@@ -221,9 +504,6 @@ export async function updatePortalPasswordAPI(appId: string, newPassword: string
   }
 }
 
-/**
- * إرسال أو إعادة إرسال بيانات الدخول إلى إيميل الطالب عبر Gmail
- */
 export async function sendCredentialsEmailAPI(appId: string): Promise<{ success: boolean; message: string }> {
   try {
     const res = await fetch(`/api/applications/${appId}/send-credentials`, {
@@ -235,4 +515,3 @@ export async function sendCredentialsEmailAPI(appId: string): Promise<{ success:
     return { success: false, message: err.message || 'تعذر إرسال البريد' };
   }
 }
-

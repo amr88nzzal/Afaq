@@ -10,6 +10,11 @@ import {
   checkServerHealthAPI 
 } from '../services/api';
 import { SettingsManager } from './SettingsManager';
+import { UniversitiesManager } from './UniversitiesManager';
+import { CountriesManager } from './CountriesManager';
+import { UsersManager } from './UsersManager';
+import { MeetingsManager } from './MeetingsManager';
+import { ParagraphsManager } from './ParagraphsManager';
 import { 
   Users, 
   Search, 
@@ -45,7 +50,9 @@ import {
   Copy,
   Terminal,
   KeyRound,
-  RefreshCw
+  RefreshCw,
+  Building2,
+  Calendar
 } from 'lucide-react';
 import { LogoRenderer } from './LogoRenderer';
 
@@ -58,6 +65,7 @@ interface StaffDashboardProps {
   onSelectApplication: (app: Application) => void;
   onSendStudentAlert: (appId: string, channel: 'whatsapp' | 'telegram' | 'email', message: string) => void;
   incomingAdminAlerts?: AdminAlert[];
+  onCountriesUpdated?: () => void;
 }
 
 export const StaffDashboard: React.FC<StaffDashboardProps> = ({
@@ -69,6 +77,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   onSelectApplication,
   onSendStudentAlert,
   incomingAdminAlerts = [],
+  onCountriesUpdated,
 }) => {
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
@@ -78,8 +87,8 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   const [adminPin, setAdminPin] = useState<string>('');
   const [pinError, setPinError] = useState<boolean>(false);
 
-  // Admin Tab Navigation: 'crm' | 'settings' | 'docker'
-  const [mainTab, setMainTab] = useState<'crm' | 'settings' | 'docker'>('crm');
+  // Admin Tab Navigation: 'crm' | 'universities' | 'countries' | 'users' | 'meetings' | 'cms' | 'settings' | 'docker'
+  const [mainTab, setMainTab] = useState<'crm' | 'universities' | 'countries' | 'users' | 'meetings' | 'cms' | 'settings' | 'docker'>('crm');
   const [isPostgresOnline, setIsPostgresOnline] = useState<boolean>(false);
 
   // Applications & Alerts state
@@ -257,12 +266,19 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   };
 
   const filteredApps = applications.filter((app) => {
+    if (!app) return false;
     const matchesStatus = statusFilter === 'all' || app.status === statusFilter;
+    const q = (searchQuery || '').toLowerCase();
+    const studentName = (app.studentName || '').toLowerCase();
+    const applicationNumber = (app.applicationNumber || '').toLowerCase();
+    const universityName = (app.universityName || '').toLowerCase();
+    const courseName = (app.courseName || '').toLowerCase();
+
     const matchesSearch = 
-      app.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      app.applicationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      app.universityName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      app.courseName.toLowerCase().includes(searchQuery.toLowerCase());
+      studentName.includes(q) ||
+      applicationNumber.includes(q) ||
+      universityName.includes(q) ||
+      courseName.includes(q);
 
     return matchesStatus && matchesSearch;
   });
@@ -413,42 +429,102 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
         <div className="flex items-center gap-2 flex-wrap border-b border-slate-800/40 pb-3">
           <button
             onClick={() => setMainTab('crm')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
               mainTab === 'crm' 
                 ? 'bg-amber-500 text-slate-950 shadow-md font-black' 
                 : isDark ? 'bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>{isAr ? 'إدارة الطلبات والطلاب (CRM)' : 'Applications & CRM'}</span>
+            <span>{isAr ? 'الطلبات والطلاب (CRM)' : 'Applications'}</span>
             <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-950/20 font-mono">
               {applications.length}
             </span>
           </button>
 
           <button
+            onClick={() => setMainTab('universities')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              mainTab === 'universities' 
+                ? 'bg-amber-500 text-slate-950 shadow-md font-black' 
+                : isDark ? 'bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            <span>{isAr ? 'الجامعات والتخصصات' : 'Universities & Majors'}</span>
+          </button>
+
+          <button
+            onClick={() => setMainTab('countries')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              mainTab === 'countries' 
+                ? 'bg-amber-500 text-slate-950 shadow-md font-black' 
+                : isDark ? 'bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            <Globe className="w-4 h-4" />
+            <span>{isAr ? 'الوجهات والدول' : 'Countries'}</span>
+          </button>
+
+          <button
+            onClick={() => setMainTab('users')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              mainTab === 'users' 
+                ? 'bg-amber-500 text-slate-950 shadow-md font-black' 
+                : isDark ? 'bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>{isAr ? 'فريق العمل والمستشارين' : 'Staff & Roles'}</span>
+          </button>
+
+          <button
+            onClick={() => setMainTab('meetings')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              mainTab === 'meetings' 
+                ? 'bg-amber-500 text-slate-950 shadow-md font-black' 
+                : isDark ? 'bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            <Calendar className="w-4 h-4" />
+            <span>{isAr ? 'مواعيد الاستشارات' : 'Appointments'}</span>
+          </button>
+
+          <button
+            onClick={() => setMainTab('cms')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              mainTab === 'cms' 
+                ? 'bg-amber-500 text-slate-950 shadow-md font-black' 
+                : isDark ? 'bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            <span>{isAr ? 'نصوص ومحتوى الموقع (CMS)' : 'CMS Content'}</span>
+          </button>
+
+          <button
             onClick={() => setMainTab('settings')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
               mainTab === 'settings' 
                 ? 'bg-amber-500 text-slate-950 shadow-md font-black' 
                 : isDark ? 'bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
             }`}
           >
             <Database className="w-4 h-4" />
-            <span>{isAr ? 'إعدادات ومعطيات المنصة (PostgreSQL)' : 'PostgreSQL Dynamic Settings'}</span>
+            <span>{isAr ? 'إعدادات المنصة (DB/SMTP)' : 'Settings'}</span>
             <span className={`w-2 h-2 rounded-full ${isPostgresOnline ? 'bg-emerald-400 animate-pulse' : 'bg-blue-400'}`} />
           </button>
 
           <button
             onClick={() => setMainTab('docker')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
               mainTab === 'docker' 
                 ? 'bg-amber-500 text-slate-950 shadow-md font-black' 
                 : isDark ? 'bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
             }`}
           >
             <Layers className="w-4 h-4" />
-            <span>{isAr ? 'بنية السيرفر والدوكر (Oracle ARM 4CPU/24GB)' : 'Docker & Cloud Deployment'}</span>
+            <span>{isAr ? 'سيرفر الدوكر (Oracle Cloud)' : 'Docker & Cloud'}</span>
           </button>
         </div>
 
@@ -658,7 +734,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                           app.destination === 'australia' ? 'bg-amber-500/20 text-amber-400' :
                           'bg-emerald-500/20 text-emerald-400'
                         }`}>
-                          {app.destination.toUpperCase()}
+                          {(app.destination || 'global').toUpperCase()}
                         </span>
                       </div>
                       <span className="text-[10px] text-slate-400">
@@ -1017,12 +1093,37 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
           </>
         )}
 
-        {/* Tab 2: Dynamic PostgreSQL Settings Manager */}
+        {/* Tab 2: Universities & Majors Manager */}
+        {mainTab === 'universities' && (
+          <UniversitiesManager lang={lang} theme={theme} />
+        )}
+
+        {/* Tab 3: Countries & Destinations Manager */}
+        {mainTab === 'countries' && (
+          <CountriesManager lang={lang} theme={theme} onCountriesUpdated={onCountriesUpdated} />
+        )}
+
+        {/* Tab 4: Users & Staff Manager */}
+        {mainTab === 'users' && (
+          <UsersManager lang={lang} theme={theme} />
+        )}
+
+        {/* Tab 5: Meetings & Consultations Manager */}
+        {mainTab === 'meetings' && (
+          <MeetingsManager lang={lang} theme={theme} />
+        )}
+
+        {/* Tab 6: CMS Paragraphs & Text Manager */}
+        {mainTab === 'cms' && (
+          <ParagraphsManager lang={lang} theme={theme} />
+        )}
+
+        {/* Tab 7: Dynamic PostgreSQL Settings Manager */}
         {mainTab === 'settings' && (
           <SettingsManager lang={lang} theme={theme} />
         )}
 
-        {/* Tab 3: Docker & Cloud Server Architecture */}
+        {/* Tab 8: Docker & Cloud Server Architecture */}
         {mainTab === 'docker' && (
           <div className={`border rounded-2xl p-6 shadow-xl space-y-6 text-start ${
             isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'

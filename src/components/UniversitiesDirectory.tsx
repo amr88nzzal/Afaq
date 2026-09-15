@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { UNIVERSITIES_DATA } from '../data/mockData';
-import { Language, DestinationCountry, University, Theme } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Language, University, Theme, UniversityEntity, CountryEntity } from '../types';
+import { fetchUniversitiesAPI, fetchCountriesAPI } from '../services/api';
 import { 
   Search, 
   GraduationCap, 
@@ -8,14 +8,17 @@ import {
   Award, 
   Coins, 
   ArrowLeft, 
-  ArrowRight,
-  Sparkles
+  ArrowRight, 
+  Sparkles,
+  ExternalLink,
+  BookOpen,
+  Loader2
 } from 'lucide-react';
 
 interface UniversitiesDirectoryProps {
   lang: Language;
   theme?: Theme;
-  onApplyForUniversity: (univ: University) => void;
+  onApplyForUniversity: (univ: any) => void;
 }
 
 export const UniversitiesDirectory: React.FC<UniversitiesDirectoryProps> = ({
@@ -27,17 +30,49 @@ export const UniversitiesDirectory: React.FC<UniversitiesDirectoryProps> = ({
   const isDark = theme === 'dark';
   const ArrowIcon = isAr ? ArrowLeft : ArrowRight;
 
-  const [selectedCountry, setSelectedCountry] = useState<string>('all');
+  const [universities, setUniversities] = useState<UniversityEntity[]>([]);
+  const [countries, setCountries] = useState<CountryEntity[]>([]);
+  const [selectedCountryId, setSelectedCountryId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const filteredUniversities = UNIVERSITIES_DATA.filter((univ) => {
-    const matchesCountry = selectedCountry === 'all' || univ.country === selectedCountry;
+  useEffect(() => {
+    async function loadDirectory() {
+      setIsLoading(true);
+      try {
+        const [uniList, countryList] = await Promise.all([
+          fetchUniversitiesAPI(),
+          fetchCountriesAPI()
+        ]);
+        setUniversities(uniList);
+        setCountries(countryList);
+      } catch (e) {
+        console.error('Failed to load universities:', e);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadDirectory();
+  }, []);
+
+  const filteredUniversities = universities.filter((univ) => {
+    if (!univ) return false;
+    const matchesCountry = selectedCountryId === 'all' || univ.country_id?.toString() === selectedCountryId;
+    const q = (searchQuery || '').toLowerCase();
+    const nameEn = (univ.name_en || '').toLowerCase();
+    const nameAr = univ.name_ar || '';
+    const cityEn = (univ.city_en || '').toLowerCase();
+    const cityAr = univ.city_ar || '';
+
     const matchesSearch = 
-      univ.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      univ.nameAr.includes(searchQuery) ||
-      univ.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      univ.cityAr.includes(searchQuery) ||
-      univ.popularMajors.some(m => m.includes(searchQuery));
+      nameEn.includes(q) ||
+      nameAr.includes(searchQuery) ||
+      cityEn.includes(q) ||
+      cityAr.includes(searchQuery) ||
+      Boolean(univ.majors?.some(m => 
+        (m.name_ar && m.name_ar.includes(searchQuery)) || 
+        (m.name_en && m.name_en.toLowerCase().includes(q))
+      ));
 
     return matchesCountry && matchesSearch;
   });
@@ -71,184 +106,163 @@ export const UniversitiesDirectory: React.FC<UniversitiesDirectoryProps> = ({
           {/* Country Tabs */}
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             <button
-              onClick={() => setSelectedCountry('all')}
+              onClick={() => setSelectedCountryId('all')}
               className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                selectedCountry === 'all'
+                selectedCountryId === 'all'
                   ? 'bg-amber-500 text-slate-950 shadow'
                   : isDark ? 'bg-slate-900 text-slate-300 border border-slate-800 hover:bg-slate-800' : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
               }`}
             >
               {isAr ? 'جميع الوجهات' : 'All Destinations'}
             </button>
-            <button
-              onClick={() => setSelectedCountry('uk')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                selectedCountry === 'uk'
-                  ? 'bg-amber-500 text-slate-950 shadow'
-                  : isDark ? 'bg-slate-900 text-slate-300 border border-slate-800 hover:bg-slate-800' : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
-              }`}
-            >
-              <span>🇬🇧</span>
-              <span>{isAr ? 'بريطانيا' : 'UK'}</span>
-            </button>
-            <button
-              onClick={() => setSelectedCountry('australia')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                selectedCountry === 'australia'
-                  ? 'bg-amber-500 text-slate-950 shadow'
-                  : isDark ? 'bg-slate-900 text-slate-300 border border-slate-800 hover:bg-slate-800' : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
-              }`}
-            >
-              <span>🇦🇺</span>
-              <span>{isAr ? 'أستراليا' : 'Australia'}</span>
-            </button>
-            <button
-              onClick={() => setSelectedCountry('new_zealand')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                selectedCountry === 'new_zealand'
-                  ? 'bg-amber-500 text-slate-950 shadow'
-                  : isDark ? 'bg-slate-900 text-slate-300 border border-slate-800 hover:bg-slate-800' : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
-              }`}
-            >
-              <span>🇳🇿</span>
-              <span>{isAr ? 'نيوزيلندا' : 'New Zealand'}</span>
-            </button>
+            {countries.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setSelectedCountryId(c.id.toString())}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  selectedCountryId === c.id.toString()
+                    ? 'bg-amber-500 text-slate-950 shadow'
+                    : isDark ? 'bg-slate-900 text-slate-300 border border-slate-800 hover:bg-slate-800' : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
+                }`}
+              >
+                <span>{isAr ? c.name_ar : c.name_en}</span>
+              </button>
+            ))}
           </div>
 
           {/* Search Box */}
-          <div className="relative w-full md:w-80">
-            <Search className="w-4 h-4 text-slate-400 absolute top-3 right-3 pointer-events-none" />
+          <div className="relative w-full md:w-72">
+            <Search className="w-4 h-4 absolute start-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder={isAr ? 'ابحث باسم الجامعة أو التخصص أو المدينة...' : 'Search university, major or city...'}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full border rounded-xl py-2 pl-3 pr-9 text-xs focus:outline-none focus:border-amber-500 ${
-                isDark ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-400' : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
+              placeholder={isAr ? 'ابحث عن جامعة، مدينة، تخصص...' : 'Search university, city, major...'}
+              className={`w-full ps-10 pe-4 py-2 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 transition-colors border ${
+                isDark ? 'bg-slate-800/80 border-slate-700 text-white placeholder-slate-400' : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-500'
               }`}
             />
           </div>
         </div>
 
-        {/* University Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredUniversities.map((univ) => (
-            <div 
-              key={univ.id}
-              className={`border rounded-2xl overflow-hidden shadow-xl transition-all flex flex-col justify-between group ${
-                isDark ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              <div>
-                {/* Image & Rank Badge */}
-                <div className="relative h-44 overflow-hidden">
-                  <img 
-                    src={univ.image} 
-                    alt={univ.nameAr}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    onError={(e) => {
-                      // Fallback image if local file fails
-                      const target = e.currentTarget;
-                      const fallback = univ.country === 'uk'
-                        ? 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=600&auto=format&fit=crop&q=80'
-                        : univ.country === 'australia'
-                        ? 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=600&auto=format&fit=crop&q=80'
-                        : 'https://images.unsplash.com/photo-1498243691581-b145c3f54a5a?w=600&auto=format&fit=crop&q=80';
-                      if (target.src !== fallback) {
-                        target.src = fallback;
-                      }
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
-                  
-                  {/* Top Bar on Image */}
-                  <div className="absolute top-3 inset-x-3 flex items-center justify-between">
-                    <span className="px-2.5 py-1 rounded-md text-[10px] font-black bg-slate-950/80 backdrop-blur-md text-amber-300 border border-amber-400/30 flex items-center gap-1">
-                      <Award className="w-3 h-3 text-amber-400" />
-                      <span>{isAr ? `المرتبة #${univ.worldRank} عالمياً` : `QS Rank #${univ.worldRank}`}</span>
-                    </span>
-                    <span className="px-2 py-0.5 rounded text-xs bg-slate-900/90 text-white font-bold border border-slate-700">
-                      {univ.country === 'uk' ? '🇬🇧 UK' : univ.country === 'australia' ? '🇦🇺 Australia' : '🇳🇿 New Zealand'}
-                    </span>
-                  </div>
+        {/* Loading State */}
+        {isLoading && (
+          <div className="py-20 flex flex-col items-center justify-center gap-3">
+            <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
+            <p className="text-sm text-slate-400">{isAr ? 'جاري استرجاع بيانات الجامعات المعتمدة...' : 'Loading verified universities...'}</p>
+          </div>
+        )}
 
-                  {/* Location badge on bottom of image */}
-                  <div className="absolute bottom-3 inset-x-3 flex items-center justify-between text-xs text-white">
-                    <span className="flex items-center gap-1 font-semibold text-slate-200">
-                      <MapPin className="w-3.5 h-3.5 text-amber-400" />
-                      <span>{isAr ? `${univ.cityAr}` : `${univ.city}`}</span>
-                    </span>
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/30 font-semibold">
-                      {isAr ? 'معتمدة بالخليج' : 'GCC Recognized'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="p-5 space-y-3 text-start">
-                  <h3 className={`text-lg font-bold group-hover:text-amber-500 transition-colors ${
-                    isDark ? 'text-white' : 'text-slate-900'
-                  }`}>
-                    {isAr ? univ.nameAr : univ.name}
-                  </h3>
-                  <div className="text-[11px] text-slate-400 font-mono">
-                    {univ.name}
-                  </div>
-
-                  <p className={`text-xs leading-relaxed line-clamp-2 ${
-                    isDark ? 'text-slate-300' : 'text-slate-600'
-                  }`}>
-                    {isAr ? univ.descriptionAr : univ.descriptionEn}
-                  </p>
-
-                  {/* Badges / Key info */}
-                  <div className={`space-y-1.5 pt-2 border-t text-[11px] ${
-                    isDark ? 'border-slate-800 text-slate-300' : 'border-slate-200 text-slate-700'
-                  }`}>
-                    <div className="flex items-center justify-between">
-                      <span className="opacity-70">{isAr ? 'الرسوم السنوية:' : 'Tuition:'}</span>
-                      <span className="font-bold text-amber-500">{univ.tuitionRange}</span>
+        {/* Universities Grid */}
+        {!isLoading && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredUniversities.map((univ) => (
+              <div 
+                key={univ.id}
+                className={`rounded-3xl border overflow-hidden transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl flex flex-col justify-between ${
+                  isDark 
+                    ? 'bg-slate-900/90 border-slate-800/80 hover:border-amber-500/40 shadow-slate-950/40' 
+                    : 'bg-white border-slate-200 hover:border-amber-500/40 shadow-slate-200/50'
+                }`}
+              >
+                <div>
+                  {/* Image & Rank Badge */}
+                  <div className="relative h-48 overflow-hidden group">
+                    <img 
+                      src={univ.image_url || 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=800&q=80'} 
+                      alt={univ.name_ar}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
+                    
+                    {/* Top Badges */}
+                    <div className="absolute top-3.5 start-3.5 flex flex-wrap gap-1.5">
+                      {univ.ranking && (
+                        <div className="px-2.5 py-1 rounded-lg bg-amber-500 text-slate-950 font-black text-xs shadow-md flex items-center gap-1">
+                          <Award className="w-3.5 h-3.5" />
+                          <span>#{univ.ranking}</span>
+                        </div>
+                      )}
+                      <div className="px-2.5 py-1 rounded-lg bg-slate-900/80 backdrop-blur-md text-amber-400 font-bold text-xs border border-amber-500/30">
+                        {isAr ? univ.country_name_ar : univ.country_name_en}
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="opacity-70">{isAr ? 'المنح المتوفرة:' : 'Scholarships:'}</span>
-                      <span className="text-emerald-500 font-bold">{univ.scholarshipRate}</span>
+
+                    {/* City & Name Overlay */}
+                    <div className="absolute bottom-3 start-3.5 end-3.5 text-start">
+                      <div className="flex items-center gap-1 text-slate-300 text-xs mb-1">
+                        <MapPin className="w-3.5 h-3.5 text-amber-500" />
+                        <span>{isAr ? (univ.city_ar || 'المدينة') : (univ.city_en || 'City')}</span>
+                      </div>
+                      <h3 className="text-lg font-black text-white leading-snug">
+                        {isAr ? univ.name_ar : univ.name_en}
+                      </h3>
                     </div>
                   </div>
 
-                  {/* Majors tags */}
-                  <div className="pt-2">
-                    <div className="text-[10px] opacity-70 mb-1 font-semibold">{isAr ? 'أبرز التخصصات المتاحة:' : 'Popular Majors:'}</div>
-                    <div className="flex flex-wrap gap-1">
-                      {univ.popularMajors.slice(0, 3).map((major, idx) => (
-                        <span key={idx} className={`px-2 py-0.5 rounded text-[10px] border ${
-                          isDark ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
-                        }`}>
-                          {major}
+                  {/* Card Body */}
+                  <div className="p-5 text-start space-y-4">
+                    <p className={`text-xs sm:text-sm line-clamp-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                      {isAr ? univ.details_ar : univ.details_en}
+                    </p>
+
+                    {/* Quick Stats */}
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/40">
+                      <div className={`p-2 rounded-xl text-xs ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">{isAr ? 'الرسوم التقديرية' : 'Est. Tuition'}</span>
+                        <span className="font-bold text-amber-500">{univ.cost_info || 'تنافسية'}</span>
+                      </div>
+                      <div className={`p-2 rounded-xl text-xs ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">{isAr ? 'نسبة القبول' : 'Acceptance'}</span>
+                        <span className="font-bold text-emerald-400">{univ.acceptance_rate || 'سريعة ومضمونة'}</span>
+                      </div>
+                    </div>
+
+                    {/* Majors Sample */}
+                    {univ.majors && univ.majors.length > 0 && (
+                      <div className="space-y-1.5">
+                        <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                          <BookOpen className="w-3 h-3 text-amber-500" />
+                          {isAr ? 'أبرز البرامج المتاحة:' : 'Popular Majors:'}
                         </span>
-                      ))}
-                    </div>
+                        <div className="flex flex-wrap gap-1">
+                          {univ.majors.slice(0, 3).map((m) => (
+                            <span key={m.id} className={`text-[10px] px-2 py-0.5 rounded-md border font-medium ${
+                              isDark ? 'bg-slate-800/80 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
+                            }`}>
+                              {isAr ? m.name_ar : m.name_en}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
 
-              {/* Card Footer Button */}
-              <div className="p-5 pt-0">
-                <button
-                  onClick={() => onApplyForUniversity(univ)}
-                  className={`w-full py-2.5 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer border ${
-                    isDark 
-                      ? 'bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-200 border-slate-700' 
-                      : 'bg-slate-100 hover:bg-amber-500 hover:text-slate-950 text-slate-800 border-slate-200'
-                  }`}
-                >
-                  <GraduationCap className="w-4 h-4" />
-                  <span>{isAr ? 'تقديم طلب قبول مجاني 100%' : 'Apply for Free Placement'}</span>
-                  <ArrowIcon className="w-3.5 h-3.5" />
-                </button>
+                {/* Apply Action Footer */}
+                <div className="p-5 pt-0">
+                  <button
+                    onClick={() => onApplyForUniversity(univ)}
+                    className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-98 cursor-pointer"
+                  >
+                    <span>{isAr ? 'تقديم طلب قبول مجاني للجامعة' : 'Apply for Free Admission'}</span>
+                    <ArrowIcon className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!isLoading && filteredUniversities.length === 0 && (
+          <div className="text-center py-16">
+            <GraduationCap className="w-12 h-12 text-slate-500 mx-auto mb-3 opacity-50" />
+            <h4 className="text-lg font-bold">{isAr ? 'لا توجد نتائج مطابقة لبحثك' : 'No universities match your search'}</h4>
+            <p className="text-xs text-slate-400 mt-1">{isAr ? 'جرب البحث بكلمات أخرى أو اختر جميع الوجهات' : 'Try different keywords or select All Destinations'}</p>
+          </div>
+        )}
 
       </div>
     </section>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Language, DestinationCountry, StudyLevel, Theme } from '../types';
+import { Language, DestinationCountry, StudyLevel, Theme, CountryEntity } from '../types';
+import { getCountryFlag } from '../utils/countryHelper';
 import { 
   GraduationCap, 
   CheckCircle2, 
@@ -18,6 +19,7 @@ interface HeroSectionProps {
   onOpenApplication: (prefillCountry?: DestinationCountry) => void;
   onNavigateDestinations: (country?: DestinationCountry) => void;
   onOpenCounselorBooking: () => void;
+  countries?: CountryEntity[];
 }
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
@@ -26,10 +28,20 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   onOpenApplication,
   onNavigateDestinations,
   onOpenCounselorBooking,
+  countries = [],
 }) => {
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
   const ArrowIcon = isAr ? ArrowLeft : ArrowRight;
+
+  // Filter only active countries
+  const activeCountries = (countries && countries.length > 0)
+    ? countries.filter(c => c.is_active !== false)
+    : [
+        { id: 1, code: 'uk', name_ar: 'بريطانيا', name_en: 'United Kingdom', is_active: true },
+        { id: 2, code: 'australia', name_ar: 'أستراليا', name_en: 'Australia', is_active: true },
+        { id: 3, code: 'new_zealand', name_ar: 'نيوزيلندا', name_en: 'New Zealand', is_active: true }
+      ];
 
   // Quick Calculator State
   const [selectedCountry, setSelectedCountry] = useState<DestinationCountry>('uk');
@@ -212,39 +224,20 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>
                 {isAr ? 'استكشف الوجهات الأكثر طلباً:' : 'Explore top study destinations:'}
               </span>
-              <button 
-                onClick={() => onNavigateDestinations('uk')} 
-                className={`px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer font-medium ${
-                  isDark 
-                    ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200' 
-                    : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800 shadow-sm'
-                }`}
-              >
-                <span>🇬🇧</span>
-                <span className="font-semibold">{isAr ? 'بريطانيا' : 'United Kingdom'}</span>
-              </button>
-              <button 
-                onClick={() => onNavigateDestinations('australia')} 
-                className={`px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer font-medium ${
-                  isDark 
-                    ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200' 
-                    : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800 shadow-sm'
-                }`}
-              >
-                <span>🇦🇺</span>
-                <span className="font-semibold">{isAr ? 'أستراليا' : 'Australia'}</span>
-              </button>
-              <button 
-                onClick={() => onNavigateDestinations('new_zealand')} 
-                className={`px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer font-medium ${
-                  isDark 
-                    ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200' 
-                    : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800 shadow-sm'
-                }`}
-              >
-                <span>🇳🇿</span>
-                <span className="font-semibold">{isAr ? 'نيوزيلندا' : 'New Zealand'}</span>
-              </button>
+              {activeCountries.map((c) => (
+                <button 
+                  key={c.code || c.id}
+                  onClick={() => onNavigateDestinations((c.code as DestinationCountry) || 'uk')} 
+                  className={`px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer font-medium ${
+                    isDark 
+                      ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200' 
+                      : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800 shadow-sm'
+                  }`}
+                >
+                  <span>{getCountryFlag(c.code)}</span>
+                  <span className="font-semibold">{isAr ? c.name_ar : c.name_en}</span>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -291,51 +284,24 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                     }`}>
                       {isAr ? '1. اختر الدولة التي ترغب بالدراسة فيها:' : '1. Target Study Destination:'}
                     </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedCountry('uk')}
-                        className={`p-2 rounded-lg text-xs font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${
-                          selectedCountry === 'uk'
-                            ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md'
-                            : isDark 
-                              ? 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700' 
-                              : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-                        }`}
-                      >
-                        <span className="text-base">🇬🇧</span>
-                        <span>{isAr ? 'بريطانيا' : 'UK'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setSelectedCountry('australia')}
-                        className={`p-2 rounded-lg text-xs font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${
-                          selectedCountry === 'australia'
-                            ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md'
-                            : isDark 
-                              ? 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700' 
-                              : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-                        }`}
-                      >
-                        <span className="text-base">🇦🇺</span>
-                        <span>{isAr ? 'أستراليا' : 'Australia'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setSelectedCountry('new_zealand')}
-                        className={`p-2 rounded-lg text-xs font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${
-                          selectedCountry === 'new_zealand'
-                            ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md'
-                            : isDark 
-                              ? 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700' 
-                              : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-                        }`}
-                      >
-                        <span className="text-base">🇳🇿</span>
-                        <span>{isAr ? 'نيوزيلندا' : 'New Zealand'}</span>
-                      </button>
+                    <div className="flex flex-wrap gap-2">
+                      {activeCountries.map((c) => (
+                        <button
+                          key={c.code || c.id}
+                          type="button"
+                          onClick={() => setSelectedCountry((c.code as DestinationCountry) || 'uk')}
+                          className={`flex-1 min-w-[85px] p-2 rounded-lg text-xs font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                            selectedCountry === c.code
+                              ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md'
+                              : isDark 
+                                ? 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700' 
+                                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                          }`}
+                        >
+                          <span className="text-base">{getCountryFlag(c.code)}</span>
+                          <span>{isAr ? c.name_ar : c.name_en}</span>
+                        </button>
+                      ))}
                     </div>
                   </div>
 

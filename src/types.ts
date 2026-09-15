@@ -1,7 +1,7 @@
 export type Language = 'ar' | 'en';
 export type Theme = 'dark' | 'light';
 
-export type DestinationCountry = 'uk' | 'australia' | 'new_zealand';
+export type DestinationCountry = 'uk' | 'australia' | 'new_zealand' | 'usa' | 'canada';
 
 export type StudyLevel = 'foundation' | 'bachelor' | 'master' | 'phd' | 'english_course';
 
@@ -17,9 +17,9 @@ export type ApplicationStage =
   | 'enrolled';
 
 export interface NotificationPreferences {
-  officialEmail: boolean; // Primary official response channel
-  whatsappAlerts: boolean; // Optional client choice
-  telegramAlerts: boolean; // Optional client choice
+  officialEmail: boolean;
+  whatsappAlerts: boolean;
+  telegramAlerts: boolean;
   whatsappPhone?: string;
   telegramUsername?: string;
 }
@@ -60,10 +60,12 @@ export interface DocumentItem {
   nameEn: string;
   category: 'passport' | 'transcript' | 'english_test' | 'recommendation' | 'sop' | 'financial' | 'identity' | 'academic' | 'language' | 'financial_guarantee';
   required: boolean;
-  status: 'pending' | 'uploaded' | 'verified' | 'action_needed';
+  status: 'pending' | 'uploaded' | 'verified' | 'action_needed' | 'missing' | 'rejected';
   fileName?: string;
   uploadedAt?: string;
   rejectionReason?: string;
+  feedback?: string;
+  file_url?: string;
 }
 
 export interface TimelineEvent {
@@ -84,23 +86,39 @@ export interface Application {
   studentName: string;
   studentEmail: string;
   studentPhone: string;
-  countryOfResidence: string;
+  studentWhatsapp?: string;
+  countryOfResidence?: string;
   destination: DestinationCountry;
-  universityName: string;
-  courseName: string;
-  level: StudyLevel;
-  intake: string;
+  countryId?: number;
+  countryNameAr?: string;
+  countryNameEn?: string;
+  universityId?: number;
+  universityName?: string;
+  universityNameAr?: string;
+  universityNameEn?: string;
+  majorId?: number;
+  majorNameAr?: string;
+  majorNameEn?: string;
+  courseName?: string;
+  level?: StudyLevel;
+  studyLevel?: string;
+  intake?: string;
+  intakeSeason?: string;
+  sponsorType?: string;
+  gpa?: string;
   status: ApplicationStage;
-  submittedAt: string;
-  updatedAt: string;
-  counselorId: string;
-  counselorName: string;
-  counselorPhone: string;
-  scholarshipInterest: boolean;
-  documents: DocumentItem[];
-  timeline: TimelineEvent[];
-  notes: string[];
+  submittedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  counselorId?: string;
+  counselorName?: string;
+  counselorPhone?: string;
+  scholarshipInterest?: boolean;
+  documents?: DocumentItem[];
+  timeline?: TimelineEvent[];
+  notes?: string[] | string;
   portalPassword?: string;
+  messages?: any[];
 }
 
 export interface Counselor {
@@ -119,24 +137,129 @@ export interface Counselor {
 }
 
 export interface University {
-  id: string;
+  id: string | number;
   name: string;
   nameAr: string;
-  country: DestinationCountry;
+  country: DestinationCountry | string;
+  country_id?: number;
+  country_name_ar?: string;
+  country_name_en?: string;
   city: string;
   cityAr: string;
   image: string;
+  image_url?: string;
   worldRank: number;
+  ranking?: number;
   badgeAr: string;
   badgeEn: string;
   tuitionRange: string;
-  intakes: string[];
-  scholarshipRate: string;
-  popularMajors: string[];
+  cost_info?: string;
+  intakes?: string[];
+  scholarshipRate?: string;
+  popularMajors?: string[];
   descriptionAr: string;
   descriptionEn: string;
-  gccAccredited: boolean;
-  workRights: string;
+  gccAccredited?: boolean;
+  workRights?: string;
+  acceptance_rate?: string;
+  featured?: boolean;
+  website_url?: string;
+  majors?: MajorEntity[];
+}
+
+export interface CountryEntity {
+  id: number;
+  code: string;
+  name_ar: string;
+  name_en: string;
+  info_ar?: string;
+  info_en?: string;
+  image_url?: string;
+  is_active?: boolean;
+}
+
+export interface UniversityEntity {
+  id: number;
+  country_id: number;
+  country_name_ar?: string;
+  country_name_en?: string;
+  name_ar: string;
+  name_en: string;
+  city_ar?: string;
+  city_en?: string;
+  details_ar?: string;
+  details_en?: string;
+  cost_info?: string;
+  ranking?: number;
+  acceptance_rate?: string;
+  featured?: boolean;
+  website_url?: string;
+  image_url?: string;
+  majors?: MajorEntity[];
+}
+
+export interface MajorEntity {
+  id: number;
+  university_id: number;
+  university_name_ar?: string;
+  name_ar: string;
+  name_en: string;
+  category?: string;
+  degree_level?: string;
+  duration?: string;
+  annual_tuition?: string;
+}
+
+export interface StaffUserEntity {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string;
+  role: 'admin' | 'counselor' | 'editor' | 'staff';
+  telegram_id?: string;
+  is_active?: boolean;
+  created_at?: string;
+}
+
+export interface CustomerEntity {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string;
+  whatsapp?: string;
+  nationality?: string;
+  current_status?: string;
+  applications_count?: number;
+  applications?: any[];
+  created_at?: string;
+}
+
+export interface MeetingEntity {
+  id: number;
+  customer_id?: number;
+  staff_id?: number;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  destination_country?: string;
+  meeting_date: string;
+  meeting_time: string;
+  meeting_type: 'video' | 'phone' | 'in_office';
+  status: 'scheduled' | 'completed' | 'cancelled' | 'no_show';
+  meeting_link?: string;
+  notes?: string;
+  counselor_name?: string;
+}
+
+export interface CMSParagraphEntity {
+  id: number;
+  slug: string;
+  section_name?: string;
+  title_ar?: string;
+  title_en?: string;
+  text_ar: string;
+  text_en: string;
+  updated_at?: string;
 }
 
 export interface ChatMessage {
@@ -148,6 +271,18 @@ export interface ChatMessage {
   channel?: 'portal' | 'whatsapp' | 'telegram' | 'email';
 }
 
+export interface LogoProposalSymbol {
+  symbolAr: string;
+  symbolEn: string;
+  meaningAr?: string;
+  meaningEn?: string;
+}
+
+export interface LogoProposalColor {
+  name: string;
+  hex: string;
+}
+
 export interface LogoProposal {
   id: number;
   titleAr: string;
@@ -155,15 +290,14 @@ export interface LogoProposal {
   taglineAr: string;
   taglineEn: string;
   conceptType: 'emblem' | 'modern_minimal' | 'luxury_gold' | 'dynamic_wings' | 'iconic_portal';
-  symbols: {
-    symbolAr: string;
-    symbolEn: string;
-    meaningAr: string;
-    meaningEn: string;
-  }[];
+  symbols: LogoProposalSymbol[];
+  typographyAr?: string;
+  typographyEn?: string;
   strengthsAr: string[];
   improvementsAr: string[];
-  colorPalette: { name: string; hex: string }[];
-  culturalAppealScore: number; // out of 10 for Gulf & Arab students
+  colorPalette: LogoProposalColor[];
+  culturalAppealScore: number;
   recommendedFor: string;
+  svgPreview?: string;
+  bestUseFor?: string;
 }

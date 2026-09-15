@@ -264,3 +264,46 @@ export async function sendStudentCredentialsEmail(data: {
   }
 }
 
+export async function sendStatusUpdateNotification(data: {
+  applicationNumber: string;
+  studentName: string;
+  studentEmail: string;
+  newStatus: string;
+  statusLabelAr?: string;
+  notes?: string;
+}): Promise<{ success: boolean; message: string }> {
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head><meta charset="utf-8"></head>
+    <body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 20px;">
+      <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 24px; border: 1px solid #e2e8f0;">
+        <h2 style="color: #0f172a;">تحديث حالة طلب القبول [${data.applicationNumber}]</h2>
+        <p>عزيزي <strong>${data.studentName}</strong>،</p>
+        <p>تم تحديث حالة طلب قبولك الأكاديمي إلى: <span style="font-weight: bold; color: #d97706;">${data.statusLabelAr || data.newStatus}</span></p>
+        ${data.notes ? `<p style="background: #f1f5f9; padding: 12px; border-radius: 8px;"><strong>ملاحظات المستشار:</strong> ${data.notes}</p>` : ''}
+        <p>يمكنك تسجيل الدخول إلى بوابة الطالب لمتابعة كافة تفاصيل القبول ومراحله.</p>
+        <p style="color: #64748b; font-size: 12px;">آفاق العالمية للخدمات التعليمية</p>
+      </div>
+    </body>
+    </html>
+  `;
+
+  if (!transporter) {
+    console.log(`📨 [Email Simulated] إشعار تحديث الحالة إلى [${data.studentEmail}]: ${data.newStatus}`);
+    return { success: true, message: 'Status notification sent (simulated)' };
+  }
+
+  try {
+    const info = await transporter.sendMail({
+      from: `"Afaq Global Admissions" <${GMAIL_USER}>`,
+      to: data.studentEmail,
+      subject: `🔔 تحديث حالة طلبك الجامعي [${data.applicationNumber}] - آفاق العالمية`,
+      html: htmlContent,
+    });
+    return { success: true, message: `Status update email sent: ${info.messageId}` };
+  } catch (error: any) {
+    return { success: false, message: error.message };
+  }
+}
+

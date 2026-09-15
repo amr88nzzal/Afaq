@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Persistent application data and uploaded documents
+server/data/
+public/uploads/
+uploads/

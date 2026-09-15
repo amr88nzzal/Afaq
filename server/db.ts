@@ -225,12 +225,19 @@ export async function testDbConnection(): Promise<boolean> {
     const client = await pool.connect();
     const res = await client.query('SELECT NOW()');
     
-    // تنفيذ ملف init.sql لتأسيس الجداول والبيانات
-    const initSqlPath = path.join(process.cwd(), 'server', 'db', 'init.sql');
-    if (fs.existsSync(initSqlPath)) {
-      const initSql = fs.readFileSync(initSqlPath, 'utf8');
-      await client.query(initSql);
-      console.log('✅ [Database] تم تنفيذ init.sql وتأسيس الجداول والبيانات بنجاح');
+    // تنفيذ ملف init.sql لتأسيس الجداول والبيانات لأول مرة فقط إن لم تكن موجودة
+    const checkTable = await client.query("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'applications')");
+    const tablesExist = checkTable.rows[0]?.exists;
+
+    if (!tablesExist) {
+      const initSqlPath = path.join(process.cwd(), 'server', 'db', 'init.sql');
+      if (fs.existsSync(initSqlPath)) {
+        const initSql = fs.readFileSync(initSqlPath, 'utf8');
+        await client.query(initSql);
+        console.log('✅ [Database] تم تنفيذ init.sql وتأسيس الجداول والبيانات لأول مرة بنجاح');
+      }
+    } else {
+      console.log('✅ [Database] الجداول والبيانات الحالية موجودة ومحفوظة مسبقاً في PostgreSQL ولم يتم مسح البيانات.');
     }
 
     // تحديث وتعديل الهيكل لتوسيع الأعمدة (Migrations)

@@ -2,20 +2,6 @@
 -- مخطط قاعدة بيانات منصة آفاق العالمية (Afaq Global Database Schema & Seeds)
 -- ============================================================================
 
--- تنظيف الجداول القديمة إن وجدت لتجنب تضارب أنواع المفاتيح الأجنبية:
-DROP TABLE IF EXISTS audit_logs CASCADE;
-DROP TABLE IF EXISTS meetings CASCADE;
-DROP TABLE IF EXISTS settings CASCADE;
-DROP TABLE IF EXISTS paragraphs CASCADE;
-DROP TABLE IF EXISTS messages CASCADE;
-DROP TABLE IF EXISTS documents CASCADE;
-DROP TABLE IF EXISTS applications CASCADE;
-DROP TABLE IF EXISTS customers CASCADE;
-DROP TABLE IF EXISTS users CASCADE;
-DROP TABLE IF EXISTS majors CASCADE;
-DROP TABLE IF EXISTS universities CASCADE;
-DROP TABLE IF EXISTS countries CASCADE;
-
 -- 1. جدول الدول والوجهات الدراسية
 CREATE TABLE IF NOT EXISTS countries (
     id SERIAL PRIMARY KEY,

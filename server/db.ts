@@ -1,40 +1,26 @@
-/**
- * ============================================================================
- * وحدة الاتصال بقاعدة بيانات PostgreSQL (PostgreSQL Database Pool Connection)
- * ============================================================================
- * هذا الملف مسؤول عن:
- * 1. إنشاء مجمع الاتصالات (Connection Pool) بقاعدة بيانات PostgreSQL.
- * 2. قراءة متغير البيئة DATABASE_URL أو خيارات الاتصال المنفصلة.
- * 3. توفير آلية احتياطية ذكية (Fallback In-Memory Store) في حال عدم توفر
- *    قاعدة البيانات في بيئة المعاينة الأولية حتى لا يتعطل الموقع مطلقاً.
- * 4. تنفيذ الاستعلامات مع تسجيل الأخطاء بوضوح باللغتين العربية والإنجليزية.
- */
-
 import pg from 'pg';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 import { UNIVERSITIES_DATA, MOCK_APPLICATIONS } from '../src/data/mockData';
 
 dotenv.config();
 
 const { Pool } = pg;
 
-// قراءة رابط الاتصال بقاعدة البيانات من متغيرات البيئة
 const databaseUrl = process.env.DATABASE_URL || 'postgres://afaq_user:ChangeMeSecurePassword123@localhost:5432/afaq_db';
 
 export const pool = new Pool({
   connectionString: databaseUrl,
-  // خيارات الأمان والاتصال السلس
   ssl: process.env.PG_SSL === 'true' ? { rejectUnauthorized: false } : false,
-  max: 20, // أقصى عدد للاتصالات المتزامنة
+  max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000, // مهلة فحص الاتصال
+  connectionTimeoutMillis: 2000,
 });
 
-// حالة الاتصال بقاعدة البيانات الفعلية
 let isPostgresConnected = false;
 
-// مخزن الذاكرة الاحتياطي (في حال لم تكن قاعدة بيانات بوستجريس مشغلة بعد)
-const inMemoryStore = {
+export const inMemoryStore = {
   settings: {
     company_name_ar: 'آفاق العالمية للخدمات التعليمية والقبولات الجامعية',
     company_name_en: 'Afaq Global Education & University Placements',
@@ -60,44 +46,33 @@ const inMemoryStore = {
   applications: [...MOCK_APPLICATIONS],
 };
 
-/**
- * فحص الاتصال بقاعدة بيانات PostgreSQL عند إقلاع السيرفر
- */
 export async function testDbConnection(): Promise<boolean> {
   try {
     const client = await pool.connect();
     const res = await client.query('SELECT NOW()');
-    isPostgresConnected = true;
-    console.log('✅ [Database] تم الاتصال بقاعدة بيانات PostgreSQL بنجاح في:', res.rows[0].now);
-
-    // التحقق التلقائي من بنية الجداول وترقية الأعمدة (Auto-Migration)
-    try {
-      await client.query(`
-        ALTER TABLE applications ADD COLUMN IF NOT EXISTS notes TEXT;
-        ALTER TABLE applications ADD COLUMN IF NOT EXISTS portal_password VARCHAR(100) DEFAULT '123456';
-        ALTER TABLE applications ADD COLUMN IF NOT EXISTS counselor_name VARCHAR(100) DEFAULT 'د. فيصل الشمري';
-        ALTER TABLE applications ADD COLUMN IF NOT EXISTS counselor_phone VARCHAR(50) DEFAULT '+966 50 123 4567';
-        ALTER TABLE applications ADD COLUMN IF NOT EXISTS stage_index INT DEFAULT 1;
-        ALTER TABLE applications ADD COLUMN IF NOT EXISTS timeline_json JSONB;
-        ALTER TABLE applications ADD COLUMN IF NOT EXISTS documents_json JSONB;
-      `);
-      console.log('🛡️ [Database Schema] تم التأكد من توافق وتحديث كافة أعمدة جدول applications');
-    } catch (schemaErr: any) {
-      console.warn('⚠️ [Database Schema] تحذير فحص أعمدة الجدول:', schemaErr.message);
+    
+    // تنفيذ ملف init.sql لضمان البنية
+    const initSqlPath = path.join(process.cwd(), 'server', 'db', 'init.sql');
+    if (fs.existsSync(initSqlPath)) {
+      const initSql = fs.readFileSync(initSqlPath, 'utf8');
+      await client.query(initSql);
+      console.log('✅ [Database] تم تنفيذ init.sql وتحديث البنية بنجاح');
     }
 
+    isPostgresConnected = true;
+    console.log('✅ [Database] تم الاتصال بقاعدة بيانات PostgreSQL بنجاح في:', res.rows[0].now);
+    
     client.release();
     return true;
   } catch (error: any) {
     isPostgresConnected = false;
-    console.warn('⚠️ [Database] تعذر الاتصال بـ PostgreSQL المباشر، سيتم استخدام مخزن الذاكرة الذكي (In-Memory Store):', error.message);
+    console.error('❌ [Database] فشل الاتصال بقاعدة بيانات PostgreSQL!');
+    console.error('❌ DATABASE_URL:', process.env.DATABASE_URL);
+    console.error('❌ خطأ الاتصال:', error.message);
     return false;
   }
 }
 
-/**
- * تنفيذ استعلام عام مع دعم الـ Fallback
- */
 export async function query(text: string, params?: any[]) {
   if (isPostgresConnected) {
     try {
@@ -110,4 +85,4 @@ export async function query(text: string, params?: any[]) {
   return null;
 }
 
-export { isPostgresConnected, inMemoryStore };
+export { isPostgresConnected };

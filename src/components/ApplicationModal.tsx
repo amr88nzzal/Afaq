@@ -83,10 +83,10 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
       phone,
       whatsapp: optInWhatsapp ? phone : undefined,
       email,
-      countryDestination: destination,
-      preferredUniversity: preferredUniversity || (destination === 'uk' ? 'University of Manchester' : destination === 'australia' ? 'University of Sydney' : 'University of Auckland'),
+      countryDestinationId: destination === 'uk' ? 1 : destination === 'australia' ? 2 : 3,
+      preferredUniversityId: 1, // Note: Should be dynamic based on university selection
+      preferredMajorId: 1, // Note: Should be dynamic based on major selection
       studyLevel,
-      preferredMajor: majorInterest,
       sponsorType: hasSponsorship === 'yes' ? 'مبتعث حكومي' : hasSponsorship === 'applying' ? 'متقدم لبرنامج ابتعاث' : 'نفقة خاصة',
       additionalNotes: `خدمات إضافية مختارة: ${selectedOptionalServices.join(', ') || 'لا يوجد'}. تلغرام: ${optInTelegram ? (telegramUsername || 'موافق') : 'غير محدد'}`,
     };

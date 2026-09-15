@@ -200,44 +200,30 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
     setTimeout(() => setAlertSuccessToast(null), 3000);
   };
 
-  // حفظ التعديلات الشاملة على الطلب (الحالة، الملاحظات، كلمة المرور) في PostgreSQL
+  // حفظ التعديلات الشاملة على الطلب
   const handleSaveSelectedAppChanges = async () => {
     if (!selectedApp) return;
     setIsSavingApp(true);
 
-    const updatedNotes = [...(selectedApp.notes || [])];
+    // 1. تحديث الحالة
+    if (editStatus !== selectedApp.status) {
+      await updateApplicationStatusAPI(selectedApp.id, editStatus);
+    }
+
+    // 2. تحديث كلمة المرور
+    if (editPortalPassword !== selectedApp.portalPassword) {
+      await updatePortalPasswordAPI(selectedApp.id, editPortalPassword);
+    }
+
+    // 3. إضافة ملاحظة إن وجدت
     if (newNoteInput.trim()) {
-      updatedNotes.push(newNoteInput.trim());
+      await updateApplicationStatusAPI(selectedApp.id, editStatus, undefined, newNoteInput.trim());
     }
 
-    const payload: Partial<Application> = {
-      status: (editStatus as ApplicationStage) || selectedApp.status,
-      notes: updatedNotes,
-      portalPassword: editPortalPassword.trim() || selectedApp.portalPassword,
-    };
-
-    const res = await updateApplicationFullAPI(selectedApp.id, payload);
     setIsSavingApp(false);
-
-    if (res.success && res.data) {
-      const saved = res.data;
-      setSelectedApp(saved);
-      setApplications(prev => prev.map(a => a.id === saved.id ? saved : a));
-      setNewNoteInput('');
-      setAlertSuccessToast(isAr ? '✅ تم حفظ وتخزين التعديلات بنجاح في قاعدة بيانات PostgreSQL!' : 'Saved in PostgreSQL database!');
-    } else {
-      // Fallback update in state
-      const fallbackApp: Application = {
-        ...selectedApp,
-        status: (editStatus as ApplicationStage) || selectedApp.status,
-        notes: updatedNotes,
-        portalPassword: editPortalPassword.trim() || selectedApp.portalPassword,
-      };
-      setSelectedApp(fallbackApp);
-      setApplications(prev => prev.map(a => a.id === fallbackApp.id ? fallbackApp : a));
-      setNewNoteInput('');
-      setAlertSuccessToast(isAr ? '✅ تم تحديث بيانات الطلب محلياً بنجاح!' : 'Application updated successfully!');
-    }
+    setNewNoteInput('');
+    setAlertSuccessToast(isAr ? '✅ تم تحديث بيانات الطلب بنجاح!' : 'Application updated successfully!');
+    
     setTimeout(() => setAlertSuccessToast(null), 4000);
   };
 

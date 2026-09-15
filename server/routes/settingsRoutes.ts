@@ -19,10 +19,16 @@ const router = Router();
 router.get('/', async (req: Request, res: Response) => {
   try {
     if (isPostgresConnected) {
-      const result = await pool.query('SELECT key, value, category, description FROM site_settings ORDER BY category, key');
-      const settingsObj: Record<string, string> = {};
+      // الجديد: جلب من جدول الإعدادات الجديد
+      const result = await pool.query('SELECT key, value_ar, value_en, value_numeric, category FROM settings');
+      const settingsObj: Record<string, any> = {};
       result.rows.forEach(row => {
-        settingsObj[row.key] = row.value;
+        settingsObj[row.key] = {
+          ar: row.value_ar,
+          en: row.value_en,
+          numeric: row.value_numeric,
+          category: row.category
+        };
       });
       return res.json({ success: true, source: 'postgres', data: settingsObj });
     }
@@ -41,30 +47,25 @@ router.get('/', async (req: Request, res: Response) => {
  */
 router.put('/', async (req: Request, res: Response) => {
   try {
-    const updates = req.body; // { key: value, ... }
+    const updates = req.body; // { key: { ar: ..., en: ..., ... }, ... }
     
     if (!updates || typeof updates !== 'object') {
       return res.status(400).json({ success: false, error: 'بيانات غير صالحة' });
     }
 
-    // تحديث مخزن الذاكرة فوراً لضمان سرعة الاستجابة
-    for (const [k, v] of Object.entries(updates)) {
-      if (typeof v === 'string') {
-        inMemoryStore.settings[k] = v;
-      }
-    }
-
     // تحديث قاعدة بيانات PostgreSQL إذا كانت متصلة
     if (isPostgresConnected) {
-      for (const [k, v] of Object.entries(updates)) {
-        if (typeof v === 'string') {
-          await pool.query(
-            `INSERT INTO site_settings (key, value, updated_at) 
-             VALUES ($1, $2, NOW()) 
-             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-            [k, v]
-          );
-        }
+      for (const [k, v] of Object.entries(updates) as [string, any]) {
+        await pool.query(
+          `INSERT INTO settings (key, value_ar, value_en, value_numeric, category) 
+           VALUES ($1, $2, $3, $4, $5) 
+           ON CONFLICT (key) DO UPDATE SET 
+             value_ar = EXCLUDED.value_ar, 
+             value_en = EXCLUDED.value_en,
+             value_numeric = EXCLUDED.value_numeric,
+             category = EXCLUDED.category`,
+          [k, v.ar || null, v.en || null, v.numeric || null, v.category || null]
+        );
       }
     }
 
@@ -72,7 +73,6 @@ router.put('/', async (req: Request, res: Response) => {
     return res.json({
       success: true,
       message: 'تم حفظ وتحديث الإعدادات بنجاح في قاعدة البيانات',
-      data: inMemoryStore.settings,
     });
   } catch (error: any) {
     console.error('Error updating settings:', error.message);

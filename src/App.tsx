@@ -80,6 +80,14 @@ export default function App() {
     refreshCMS();
   }, []);
 
+  // Sync theme primary color and contrast mode attributes on root html tag
+  useEffect(() => {
+    if (settings) {
+      document.documentElement.setAttribute('data-theme-color', settings.theme_primary_color || 'amber');
+      document.documentElement.setAttribute('data-contrast', settings.theme_contrast_mode || 'normal');
+    }
+  }, [settings]);
+
   // Filter only active countries for public visitor views
   const activeCountries = countries.length > 0
     ? countries.filter(c => c.is_active !== false)

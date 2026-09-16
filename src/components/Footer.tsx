@@ -35,6 +35,17 @@ export const Footer: React.FC<FooterProps> = ({
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
 
+  const handleScrollToServices = (e: React.MouseEvent) => {
+    e.preventDefault();
+    onNavigate('home');
+    setTimeout(() => {
+      const element = document.getElementById('services-model-section');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 150);
+  };
+
   const companyName = isAr 
     ? (settings?.company_name_ar || '*** آفاق العالمية للخدمات التعليمية والقبولات الجامعية')
     : (settings?.company_name_en || 'Afaq Global Education & University Placements');
@@ -189,10 +200,10 @@ export const Footer: React.FC<FooterProps> = ({
                 </button>
               </li>
               <li>
-                <a href="#services-model-section" className="hover:text-amber-500 transition-colors flex items-center gap-1.5 text-emerald-500 font-bold">
+                <button onClick={handleScrollToServices} className="hover:text-amber-500 transition-colors flex items-center gap-1.5 text-emerald-500 font-bold text-start">
                   <span>•</span>
                   <span>{isAr ? 'باقات ما بعد القبول الاختيارية' : 'Post-Admission Concierge Services'}</span>
-                </a>
+                </button>
               </li>
               <li>
                 <button onClick={() => onNavigate('logo-lab')} className="hover:text-amber-500 transition-colors flex items-center gap-1.5 text-amber-500">

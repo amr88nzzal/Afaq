@@ -40,3 +40,185 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* ============================================================================
+   محرك الألوان الرئيسي ودرجات التباين الديناميكية (Dynamic Theme Accent Engine)
+   ============================================================================ */
+
+/* 1. الأزرق الملكي (Royal Academic Blue) */
+html[data-theme-color="blue"] .bg-amber-500,
+html[data-theme-color="blue"] .bg-amber-600 {
+  background-color: #2563eb !important;
+}
+html[data-theme-color="blue"] .hover\:bg-amber-600:hover,
+html[data-theme-color="blue"] .hover\:bg-amber-700:hover {
+  background-color: #1d4ed8 !important;
+}
+html[data-theme-color="blue"] .text-amber-500,
+html[data-theme-color="blue"] .text-amber-400,
+html[data-theme-color="blue"] .text-amber-300 {
+  color: #3b82f6 !important;
+}
+html[data-theme-color="blue"] .border-amber-500,
+html[data-theme-color="blue"] .border-amber-500\/30,
+html[data-theme-color="blue"] .border-amber-400 {
+  border-color: #3b82f6 !important;
+}
+html[data-theme-color="blue"] .bg-amber-500\/10,
+html[data-theme-color="blue"] .bg-amber-500\/20 {
+  background-color: rgba(37, 99, 235, 0.15) !important;
+}
+html[data-theme-color="blue"] .from-amber-600 {
+  --tw-gradient-from: #1d4ed8 !important;
+}
+html[data-theme-color="blue"] .via-amber-500 {
+  --tw-gradient-stops: var(--tw-gradient-via-stops, #2563eb) !important;
+}
+html[data-theme-color="blue"] .to-amber-600 {
+  --tw-gradient-to: #1d4ed8 !important;
+}
+
+/* 2. الزمردي الراقي (Emerald Green) */
+html[data-theme-color="emerald"] .bg-amber-500,
+html[data-theme-color="emerald"] .bg-amber-600 {
+  background-color: #059669 !important;
+}
+html[data-theme-color="emerald"] .hover\:bg-amber-600:hover,
+html[data-theme-color="emerald"] .hover\:bg-amber-700:hover {
+  background-color: #047857 !important;
+}
+html[data-theme-color="emerald"] .text-amber-500,
+html[data-theme-color="emerald"] .text-amber-400,
+html[data-theme-color="emerald"] .text-amber-300 {
+  color: #10b981 !important;
+}
+html[data-theme-color="emerald"] .border-amber-500,
+html[data-theme-color="emerald"] .border-amber-500\/30,
+html[data-theme-color="emerald"] .border-amber-400 {
+  border-color: #10b981 !important;
+}
+html[data-theme-color="emerald"] .bg-amber-500\/10,
+html[data-theme-color="emerald"] .bg-amber-500\/20 {
+  background-color: rgba(5, 150, 105, 0.15) !important;
+}
+html[data-theme-color="emerald"] .from-amber-600 {
+  --tw-gradient-from: #047857 !important;
+}
+html[data-theme-color="emerald"] .via-amber-500 {
+  --tw-gradient-stops: var(--tw-gradient-via-stops, #059669) !important;
+}
+html[data-theme-color="emerald"] .to-amber-600 {
+  --tw-gradient-to: #047857 !important;
+}
+
+/* 3. النيلي الأنيق (Deep Indigo) */
+html[data-theme-color="indigo"] .bg-amber-500,
+html[data-theme-color="indigo"] .bg-amber-600 {
+  background-color: #4f46e5 !important;
+}
+html[data-theme-color="indigo"] .hover\:bg-amber-600:hover,
+html[data-theme-color="indigo"] .hover\:bg-amber-700:hover {
+  background-color: #4338ca !important;
+}
+html[data-theme-color="indigo"] .text-amber-500,
+html[data-theme-color="indigo"] .text-amber-400,
+html[data-theme-color="indigo"] .text-amber-300 {
+  color: #6366f1 !important;
+}
+html[data-theme-color="indigo"] .border-amber-500,
+html[data-theme-color="indigo"] .border-amber-500\/30,
+html[data-theme-color="indigo"] .border-amber-400 {
+  border-color: #6366f1 !important;
+}
+html[data-theme-color="indigo"] .bg-amber-500\/10,
+html[data-theme-color="indigo"] .bg-amber-500\/20 {
+  background-color: rgba(79, 70, 229, 0.15) !important;
+}
+html[data-theme-color="indigo"] .from-amber-600 {
+  --tw-gradient-from: #4338ca !important;
+}
+html[data-theme-color="indigo"] .via-amber-500 {
+  --tw-gradient-stops: var(--tw-gradient-via-stops, #4f46e5) !important;
+}
+html[data-theme-color="indigo"] .to-amber-600 {
+  --tw-gradient-to: #4338ca !important;
+}
+
+/* 4. الياقوتي المميز (Ruby Red) */
+html[data-theme-color="ruby"] .bg-amber-500,
+html[data-theme-color="ruby"] .bg-amber-600 {
+  background-color: #d32248 !important;
+}
+html[data-theme-color="ruby"] .hover\:bg-amber-600:hover,
+html[data-theme-color="ruby"] .hover\:bg-amber-700:hover {
+  background-color: #be123c !important;
+}
+html[data-theme-color="ruby"] .text-amber-500,
+html[data-theme-color="ruby"] .text-amber-400,
+html[data-theme-color="ruby"] .text-amber-300 {
+  color: #f15d75 !important;
+}
+html[data-theme-color="ruby"] .border-amber-500,
+html[data-theme-color="ruby"] .border-amber-500\/30,
+html[data-theme-color="ruby"] .border-amber-400 {
+  border-color: #ee5e76e9 !important;
+}
+html[data-theme-color="ruby"] .bg-amber-500\/10,
+html[data-theme-color="ruby"] .bg-amber-500\/20 {
+  background-color: rgba(225, 29, 72, 0.15) !important;
+}
+html[data-theme-color="ruby"] .from-amber-600 {
+  --tw-gradient-from: #be123c !important;
+}
+html[data-theme-color="ruby"] .via-amber-500 {
+  --tw-gradient-stops: var(--tw-gradient-via-stops, #e11d48) !important;
+}
+html[data-theme-color="ruby"] .to-amber-600 {
+  --tw-gradient-to: #be123c !important;
+}
+
+/* 5. وضعية التباين العالي (High Contrast Mode) */
+html[data-contrast="high"] {
+  filter: contrast(1.15) saturate(1.05);
+}
+
+/* تحسين وضوح النصوص الرمادية والخطوط الباهتة في الوضع النهاري (Light Mode - High Contrast) */
+html[data-contrast="high"]:not(.dark) .text-slate-400,
+html[data-contrast="high"]:not(.dark) .text-gray-400 {
+  color: #2d3f59 !important; /* درجة رمادي غامق واضحة جداً بدلاً من الرمادي الفاتح */
+}
+html[data-contrast="high"]:not(.dark) .text-slate-500,
+html[data-contrast="high"]:not(.dark) .text-gray-500 {
+  color: #212a36 !important; /* زيادة درجة حدة الخطوط */
+}
+html[data-contrast="high"]:not(.dark) .text-slate-600,
+html[data-contrast="high"]:not(.dark) .text-gray-600 {
+  color: #141c28 !important; /* تباين فائق للنصوص المرافقة */
+}
+html[data-contrast="high"]:not(.dark) .text-slate-700,
+html[data-contrast="high"]:not(.dark) .text-gray-700 {
+  color: #060a15 !important; /* اللون شبه الأسود للقراءة المثالية */
+}
+html[data-contrast="high"]:not(.dark) .border-slate-100,
+html[data-contrast="high"]:not(.dark) .border-slate-200,
+html[data-contrast="high"]:not(.dark) .border-gray-200 {
+  border-color: #bec6d0 !important; /* توضيح حدود الصناديق والمربعات */
+}
+
+/* تحسين وضوح النصوص في الوضع الليلي المتباين (Dark Mode - High Contrast) */
+html[data-contrast="high"].dark .text-slate-400,
+html[data-contrast="high"].dark .text-gray-400 {
+  color: #f1f5f9 !important; /* زيادة تفتيح النصوص الباهتة لتسهيل القراءة في الظلام */
+}
+html[data-contrast="high"].dark .text-slate-500,
+html[data-contrast="high"].dark .text-gray-500 {
+  color: #e2e8f0 !important;
+}
+html[data-contrast="high"].dark .text-slate-600,
+html[data-contrast="high"].dark .text-gray-600 {
+  color: #cbd5e1 !important;
+}
+html[data-contrast="high"].dark .border-slate-800,
+html[data-contrast="high"].dark .border-slate-700 {
+  border-color: #475569 !important; /* جعل الحدود والبرواز أكثر تبياناً */
+}

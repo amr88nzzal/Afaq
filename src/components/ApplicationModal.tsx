@@ -177,9 +177,9 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
       majorNameEn: selectedMajor?.name_en || 'Computer Science',
       level: studyLevel,
       status: 'under_review',
-      counselorId: '1',
-      counselorName: 'د. فيصل الشمري',
-      counselorPhone: '+966 50 123 4567',
+      counselorId: '',
+      counselorName: '',
+      counselorPhone: '',
       portalPassword: '123456',
       notes: [`الوجهة: ${selectedCountry?.name_ar || 'بريطانيا'}`, `الجامعة: ${selectedUni?.name_ar || ''}`],
       documents: [

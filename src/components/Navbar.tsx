@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LogoRenderer } from './LogoRenderer';
 import { Language, Theme, CMSParagraphEntity } from '../types';
 import { SiteSettings } from '../services/api';
@@ -17,7 +17,8 @@ import {
   Plane,
   ShieldCheck,
   CheckCircle2,
-  MessageCircle
+  MessageCircle,
+  Eye
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -48,8 +49,50 @@ export const Navbar: React.FC<NavbarProps> = ({
   cmsParagraphs,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [contrastMode, setContrastMode] = useState<string>(() => {
+    return typeof document !== 'undefined' ? (document.documentElement.getAttribute('data-contrast') || 'normal') : 'normal';
+  });
+
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
+
+  // Sync contrast mode state when settings change
+  useEffect(() => {
+    if (settings?.theme_contrast_mode) {
+      setContrastMode(settings.theme_contrast_mode);
+      document.documentElement.setAttribute('data-contrast', settings.theme_contrast_mode);
+    }
+  }, [settings?.theme_contrast_mode]);
+
+  const handleToggleContrast = () => {
+    const nextContrast = contrastMode === 'high' ? 'normal' : 'high';
+    setContrastMode(nextContrast);
+    document.documentElement.setAttribute('data-contrast', nextContrast);
+    
+    // Also save in local storage for instant loading on reload if settings aren't loaded yet
+    try {
+      localStorage.setItem('theme_contrast_mode', nextContrast);
+    } catch (e) {}
+  };
+
+  const handleScrollToServices = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (activeView !== 'home') {
+      onNavigate('home');
+      setTimeout(() => {
+        const element = document.getElementById('services-model-section');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 150);
+    } else {
+      const element = document.getElementById('services-model-section');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+    setMobileMenuOpen(false);
+  };
 
   const rawWhatsapp = settings?.company_whatsapp || '+966 50 876 5432';
   const cleanWhatsapp = rawWhatsapp.replace(/\D/g, '') || '966508765432';
@@ -144,15 +187,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>{isAr ? 'دليل الجامعات والمنح' : 'Universities Directory'}</span>
             </button>
 
-            <a
-              href="#services-model-section"
+            <button
+              onClick={handleScrollToServices}
               className={`px-3 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 ${
                 isDark ? 'text-slate-200 hover:text-white hover:bg-slate-850' : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100'
               }`}
             >
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
               <span>{isAr ? 'القبول المجاني وباقات ما بعد القبول' : 'Concierge & Free Model'}</span>
-            </a>
+            </button>
 
             <button
               onClick={() => onNavigate('research')}
@@ -163,7 +206,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-              <span>{isAr ? 'ما يميزنا (لأننا نهتم بكم)' : 'Why Choose Us'}</span>
+              <span>{isAr ? `نهتم بكم` : `We Care About You`}</span>
             </button>
           </nav>
 
@@ -206,6 +249,26 @@ export const Navbar: React.FC<NavbarProps> = ({
               {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4 text-slate-700" />}
             </button>
 
+            {/* High Contrast Mode Toggle */}
+            <button
+              onClick={handleToggleContrast}
+              id="contrast-toggle-btn"
+              className={`p-2 rounded-xl border text-xs font-bold transition-colors relative group ${
+                contrastMode === 'high'
+                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-500'
+                  : isDark ? 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'
+              }`}
+              title={isAr ? 'وضعية التباين العالي الفائقة' : 'High Contrast Mode'}
+            >
+              <Eye className="w-4 h-4" />
+              {contrastMode === 'high' && (
+                <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                </span>
+              )}
+            </button>
+
             {/* Language Toggle */}
             <button
               onClick={onToggleLang}
@@ -229,6 +292,25 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+
+            {/* Mobile Contrast Mode Toggle */}
+            <button
+              onClick={handleToggleContrast}
+              className={`p-2 rounded-xl border relative ${
+                contrastMode === 'high'
+                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-500'
+                  : isDark ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-650'
+              }`}
+              title={isAr ? 'وضعية التباين العالي الفائقة' : 'High Contrast Mode'}
+            >
+              <Eye className="w-4 h-4" />
+              {contrastMode === 'high' && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+                </span>
+              )}
             </button>
 
             <button
@@ -286,6 +368,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           <button
+            onClick={handleScrollToServices}
+            className="w-full py-2.5 px-3 rounded-xl text-xs font-bold text-start text-emerald-500 hover:bg-emerald-500/10"
+          >
+            {isAr ? 'القبول المجاني وباقات ما بعد القبول' : 'Concierge & Free Model'}
+          </button>
+
+          <button
             onClick={() => { onNavigate('student-portal'); setMobileMenuOpen(false); }}
             className="w-full py-2.5 px-3 rounded-xl text-xs font-bold text-start bg-blue-600/20 text-blue-400 border border-blue-500/30"
           >
@@ -296,7 +385,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => { onNavigate('research'); setMobileMenuOpen(false); }}
             className="w-full py-2.5 px-3 rounded-xl text-xs font-bold text-start text-emerald-400"
           >
-            {isAr ? 'ما يميزنا (لأننا نهتم بكم)' : 'Why Choose Us'}
+            {isAr ? 'نهتم بكم' : 'We Care About You'}
           </button>
 
           <div className="pt-2">

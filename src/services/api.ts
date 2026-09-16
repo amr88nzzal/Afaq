@@ -35,6 +35,8 @@ export interface SiteSettings {
   admin_notification_email: string;
   telegram_bot_token: string;
   telegram_chat_id: string;
+  theme_primary_color?: string;
+  theme_contrast_mode?: string;
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -57,6 +59,8 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   admin_notification_email: 'admin@amrodev.com, amr.nzzal@gmail.com',
   telegram_bot_token: '',
   telegram_chat_id: '',
+  theme_primary_color: 'amber',
+  theme_contrast_mode: 'normal',
 };
 
 // ==========================================

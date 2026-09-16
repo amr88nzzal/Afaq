@@ -33,7 +33,10 @@ import {
   Check, 
   Terminal,
   ShieldCheck,
-  Server
+  Server,
+  Palette,
+  Sparkles,
+  Eye
 } from 'lucide-react';
 
 interface SettingsManagerProps {
@@ -52,7 +55,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ lang, theme, o
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [copiedSql, setCopiedSql] = useState<boolean>(false);
-  const [activeSubTab, setActiveSubTab] = useState<'contact' | 'content' | 'notifications' | 'sql'>('contact');
+  const [activeSubTab, setActiveSubTab] = useState<'contact' | 'content' | 'theme' | 'notifications' | 'sql'>('contact');
 
   // جلب الإعدادات وفحص صحة قاعدة البيانات عند التحميل
   const loadSettings = async () => {
@@ -194,6 +197,19 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW();`;
         >
           <Globe className="w-3.5 h-3.5" />
           <span>{isAr ? 'النصوص والإعلانات' : 'Content & Announcements'}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('theme')}
+          className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors ${
+            activeSubTab === 'theme'
+              ? 'bg-amber-500 text-slate-950 shadow-md'
+              : isDark ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+          }`}
+        >
+          <Palette className="w-3.5 h-3.5" />
+          <span>{isAr ? 'الهوية البصرية والألوان' : 'Visual Brand & Colors'}</span>
         </button>
 
         <button
@@ -417,6 +433,188 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW();`;
                     isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
                   }`}
                 />
+              </div>
+            </div>
+          )}
+
+          {/* Tab: Visual Brand & Theme Colors */}
+          {activeSubTab === 'theme' && (
+            <div className="space-y-6">
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-blue-500/10 to-emerald-500/10 border border-amber-500/20 text-xs space-y-2">
+                <div className="font-bold flex items-center gap-2 text-amber-400 text-sm">
+                  <Sparkles className="w-4 h-4" />
+                  <span>{isAr ? 'محرك التحكم بالألوان الرئيسية والتباين البصري للموقع' : 'Dynamic Theme Color & Contrast Controller'}</span>
+                </div>
+                <p className={isDark ? 'text-slate-300' : 'text-slate-700'}>
+                  {isAr 
+                    ? 'يمكنك تغيير اللون الأساسي للموقع بالكامل (من البرتقالي الملكي إلى الأزرق الأكاديمي، الزمردي الأخضر، النيلي أو الياقوتي) والتحكم في حدة التباين فوراً بدون إعادة التكويت.'
+                    : 'Switch the primary color accent across the entire website dynamically (Amber Gold, Royal Blue, Emerald Green, Indigo, Ruby Red) and adjust contrast sharpness.'}
+                </p>
+              </div>
+
+              {/* 1. Primary Color Selection */}
+              <div>
+                <label className="block text-xs font-black mb-3 flex items-center gap-2">
+                  <Palette className="w-4 h-4 text-amber-500" />
+                  <span>{isAr ? '1. اختر اللون الأساسي للمنصة (Primary Brand Color Palette):' : '1. Select Primary Brand Color Palette:'}</span>
+                </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {[
+                    { id: 'amber', nameAr: 'البرتقالي الملكي (Amber Gold)', nameEn: 'Royal Amber Gold', hex: '#f59e0b', descAr: 'الهوية الرئيسية المعتمدة لمؤسسة آفاق', descEn: 'Official default brand theme' },
+                    { id: 'blue', nameAr: 'الأزرق الأكاديمي (Academic Royal Blue)', nameEn: 'Academic Royal Blue', hex: '#2563eb', descAr: 'طابع دبلوماسي وأكاديمي عالي الرقي', descEn: 'Diplomatic & prestige academic theme' },
+                    { id: 'emerald', nameAr: 'الزمردي الأخضر (Emerald Green)', nameEn: 'Emerald Green', hex: '#059669', descAr: 'يعكس الأمان والاعتمادية والنمو الأكاديمي', descEn: 'Trust, growth & security accent' },
+                    { id: 'indigo', nameAr: 'النيلي المتقدم (Deep Indigo)', nameEn: 'Deep Indigo Violet', hex: '#4f46e5', descAr: 'طابع التكنولوجيا المتقدمة والابتكار', descEn: 'Modern tech & innovation accent' },
+                    { id: 'ruby', nameAr: 'الياقوتي الفاخر (Ruby Red)', nameEn: 'Ruby Red', hex: '#e11d48', descAr: 'طابع الحماس والتفوق الأكاديمي', descEn: 'Passionate academic distinction' },
+                  ].map((color) => {
+                    const isSelected = (settings.theme_primary_color || 'amber') === color.id;
+                    return (
+                      <button
+                        key={color.id}
+                        type="button"
+                        onClick={() => {
+                          handleChange('theme_primary_color', color.id);
+                          document.documentElement.setAttribute('data-theme-color', color.id);
+                        }}
+                        className={`p-3.5 rounded-2xl border text-right transition-all flex flex-col justify-between ${
+                          isSelected 
+                            ? 'border-amber-500 ring-2 ring-amber-500/40 bg-amber-500/10' 
+                            : isDark ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="w-4 h-4 rounded-full border border-white/20 shadow-sm" style={{ backgroundColor: color.hex }} />
+                            <span className="text-xs font-black">{isAr ? color.nameAr : color.nameEn}</span>
+                          </div>
+                          {isSelected && (
+                            <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black">
+                              {isAr ? 'مُفعل' : 'Active'}
+                            </span>
+                          )}
+                        </div>
+                        <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {isAr ? color.descAr : color.descEn}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 2. Contrast Control with Visual Switch and Active State Indicator */}
+              <div className={`p-5 rounded-2xl border ${isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'} space-y-4`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <label className="text-sm font-black flex items-center gap-2">
+                      <Eye className="w-4 h-4 text-amber-500" />
+                      <span>{isAr ? 'وضعية التباين العالي الفائقة (High Contrast Mode)' : 'High Contrast Mode'}</span>
+                    </label>
+                    <p className={`text-xs ${isDark ? 'text-slate-450' : 'text-slate-500'}`}>
+                      {isAr 
+                        ? 'تطبيق فلاتر بصرية فورية على مستوى جذر الصفحة (HTML) مع تفتيح وتغميق ذكي للنصوص لتسهيل القراءة.'
+                        : 'Apply real-time root CSS filters and intelligent color adaptation to make text exceptionally readable.'}
+                    </p>
+                  </div>
+
+                  {/* Active Indicator & Toggle Switch */}
+                  <div className="flex items-center gap-3">
+                    {/* Visual Indicator Badge */}
+                    <div className="flex items-center gap-2">
+                      <span className={`relative flex h-2.5 w-2.5`}>
+                        {settings.theme_contrast_mode === 'high' && (
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        )}
+                        <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${settings.theme_contrast_mode === 'high' ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                      </span>
+                      <span className={`text-[11px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                        settings.theme_contrast_mode === 'high'
+                          ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/25'
+                          : 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                      }`}>
+                        {settings.theme_contrast_mode === 'high' 
+                          ? (isAr ? 'مُفعّل ومحسّن 👁️' : 'Enabled & Optimized 👁️') 
+                          : (isAr ? 'معطّل (قياسي) ⚙️' : 'Disabled (Standard) ⚙️')
+                        }
+                      </span>
+                    </div>
+
+                    {/* Sliding Toggle Switch Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newMode = settings.theme_contrast_mode === 'high' ? 'normal' : 'high';
+                        handleChange('theme_contrast_mode', newMode);
+                        document.documentElement.setAttribute('data-contrast', newMode);
+                      }}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        settings.theme_contrast_mode === 'high' ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'
+                      }`}
+                      aria-label="Toggle High Contrast Mode"
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          settings.theme_contrast_mode === 'high' ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sub-selectors for visual clarity */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleChange('theme_contrast_mode', 'normal');
+                      document.documentElement.setAttribute('data-contrast', 'normal');
+                    }}
+                    className={`p-3 rounded-xl border text-right transition-all flex flex-col justify-between ${
+                      (settings.theme_contrast_mode || 'normal') === 'normal'
+                        ? 'border-amber-500 bg-amber-500/10'
+                        : isDark ? 'bg-slate-950 border-slate-800 hover:border-slate-750' : 'bg-white border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <span className="font-bold text-xs">{isAr ? '1. التباين القياسي المتوازن' : '1. Standard Balanced Contrast'}</span>
+                    <span className={`text-[10px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {isAr ? 'ألوان ناعمة ومريحة للعين في ظروف الإضاءة القياسية.' : 'Soft and gentle colors for everyday normal lighting.'}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleChange('theme_contrast_mode', 'high');
+                      document.documentElement.setAttribute('data-contrast', 'high');
+                    }}
+                    className={`p-3 rounded-xl border text-right transition-all flex flex-col justify-between ${
+                      settings.theme_contrast_mode === 'high'
+                        ? 'border-amber-500 bg-amber-500/10'
+                        : isDark ? 'bg-slate-950 border-slate-800 hover:border-slate-750' : 'bg-white border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <span className="font-bold text-xs text-amber-500">{isAr ? '2. تباين فائق وعالي الوضوح' : '2. Ultra High Contrast'}</span>
+                    <span className={`text-[10px] mt-1 ${isDark ? 'text-slate-300' : 'text-slate-650'}`}>
+                      {isAr ? 'يغمق النصوص الرمادية الباهتة في النهار ويفتحها بالليل للقراءة المريحة بنسبة 100%.' : 'Darkens faded gray text in light mode and clarifies borders.'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Live Preview Card */}
+              <div className={`p-4 rounded-2xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'}`}>
+                <div className="text-xs font-bold mb-3 text-slate-400">{isAr ? 'معاينة حية لشكل العناصر باللون والتباين المختار:' : 'Live Preview of Components:'}</div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-black text-xs">
+                    {isAr ? 'زر رئيسي معتمد' : 'Primary Button'}
+                  </span>
+                  <span className="px-3 py-1.5 rounded-xl border border-amber-500 text-amber-500 font-bold text-xs">
+                    {isAr ? 'زر مفرغ مخصص' : 'Outline Button'}
+                  </span>
+                  <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold border border-amber-500/30">
+                    {isAr ? 'وسام حالة فعال' : 'Active Status Badge'}
+                  </span>
+                </div>
               </div>
             </div>
           )}

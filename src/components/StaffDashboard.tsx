@@ -12,7 +12,8 @@ import {
   checkServerHealthAPI,
   loginStaffAPI,
   fetchMessagesAPI,
-  sendMessageAPI
+  sendMessageAPI,
+  fetchStaffUsersAPI
 } from '../services/api';
 import { SettingsManager } from './SettingsManager';
 import { UniversitiesManager } from './UniversitiesManager';
@@ -155,6 +156,8 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   const [editStatus, setEditStatus] = useState<string>('');
   const [newNoteInput, setNewNoteInput] = useState<string>('');
   const [editPortalPassword, setEditPortalPassword] = useState<string>('');
+  const [editCounselorId, setEditCounselorId] = useState<string>('');
+  const [staffList, setStaffList] = useState<StaffUserEntity[]>([]);
   const [isSavingApp, setIsSavingApp] = useState<boolean>(false);
   const [isSendingCreds, setIsSendingCreds] = useState<boolean>(false);
   const [isSendingResponse, setIsSendingResponse] = useState<boolean>(false);
@@ -167,6 +170,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
     if (selectedApp) {
       setEditStatus(selectedApp.status || 'under_review');
       setEditPortalPassword(selectedApp.portalPassword || '');
+      setEditCounselorId(selectedApp.counselorId || '');
 
       async function loadAppMsgs() {
         const msgs = await fetchMessagesAPI(selectedApp.id);
@@ -189,6 +193,14 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
       if (serverApps && serverApps.length > 0) {
         setApplications(serverApps);
         if (!selectedApp) setSelectedApp(serverApps[0]);
+      }
+      try {
+        const staff = await fetchStaffUsersAPI();
+        if (staff && staff.length > 0) {
+          setStaffList(staff);
+        }
+      } catch (err) {
+        console.warn('Error fetching staff list:', err);
       }
       const health = await checkServerHealthAPI();
       setIsPostgresOnline(health.postgres);
@@ -229,7 +241,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
         if (passVal === 'afaq2026' || passVal === 'admin123') {
           const fallbackUser: StaffUserEntity = {
             id: 1,
-            name: userVal || (isAr ? 'د. فيصل الشمري' : 'Dr. Faisal Al-Shammari'),
+            name: userVal || (isAr ? 'مدير النظام' : 'System Administrator'),
             email: userVal.includes('@') ? userVal : 'faisal@afaq-global.com',
             role: 'admin',
             is_active: true
@@ -355,6 +367,32 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
     if (newNoteInput.trim()) {
       await updateApplicationStatusAPI(selectedApp.id, editStatus, undefined, newNoteInput.trim());
     }
+
+    // 4. تحديث المستشار المسؤول (إسناد الطلب للموظف)
+    const assignedCounselor = staffList.find(s => s.id.toString() === editCounselorId || s.email === editCounselorId);
+    const newCounselorId = assignedCounselor ? assignedCounselor.id.toString() : '';
+    const newCounselorName = assignedCounselor ? assignedCounselor.name : '';
+    const newCounselorPhone = assignedCounselor ? assignedCounselor.phone || '' : '';
+
+    if (editCounselorId !== (selectedApp.counselorId || '')) {
+      await updateApplicationFullAPI(selectedApp.id, {
+        counselorId: newCounselorId,
+        counselorName: newCounselorName,
+        counselorPhone: newCounselorPhone
+      });
+    }
+
+    // 5. تحديث الحالات محلياً
+    const updatedApp = {
+      ...selectedApp,
+      status: editStatus,
+      portalPassword: editPortalPassword,
+      counselorId: newCounselorId,
+      counselorName: newCounselorName,
+      counselorPhone: newCounselorPhone
+    };
+    setSelectedApp(updatedApp);
+    setApplications(prev => prev.map(a => a.id === updatedApp.id ? updatedApp : a));
 
     setIsSavingApp(false);
     setNewNoteInput('');
@@ -1194,6 +1232,27 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                         }`}
                       />
                     </div>
+                  </div>
+                  
+                  {/* Counselor Dropdown */}
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-400 block text-[11px]">
+                      {isAr ? 'المستشار الأكاديمي المسؤول (إسناد الطلب للموظف):' : 'Assigned Academic Counselor (Assign to Staff):'}
+                    </label>
+                    <select
+                      value={editCounselorId}
+                      onChange={(e) => setEditCounselorId(e.target.value)}
+                      className={`w-full p-2 rounded-xl border text-xs font-semibold focus:outline-none focus:border-amber-500 ${
+                        isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                      }`}
+                    >
+                      <option value="">{isAr ? '-- اختر مستشاراً من الموظفين لإسناد الطلب --' : '-- Choose counselor to assign --'}</option>
+                      {staffList.map((staff) => (
+                        <option key={staff.id} value={staff.id}>
+                          {staff.name} - {staff.email} ({staff.role === 'admin' ? (isAr ? 'مدير' : 'Admin') : staff.role === 'counselor' ? (isAr ? 'مستشار' : 'Counselor') : (isAr ? 'موظف' : 'Staff')})
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   {/* Add Administrative Note */}

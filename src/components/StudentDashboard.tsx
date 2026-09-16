@@ -1037,11 +1037,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center font-black text-slate-950 text-base shadow">
-                  {application.counselorName ? application.counselorName.slice(0, 2) : 'آفاق'}
+                  {application.counselorName ? application.counselorName.slice(0, 2) : (isAr ? 'مستشار' : 'Advisor')}
                 </div>
                 <div>
                   <h4 className="font-bold text-sm">
-                    {application.counselorName || 'د. فيصل الشمري'}
+                    {application.counselorName || (isAr ? 'مستشار آفاق الأكاديمي' : 'Afaq Academic Advisor')}
                   </h4>
                   <p className="text-xs text-slate-400">
                     {isAr ? 'مستشار قبولات بريطانيا وأستراليا المعتمد' : 'Certified UK & Australia Placement Advisor'}
@@ -1051,7 +1051,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
               <div className="grid grid-cols-2 gap-2 pt-2">
                 <a
-                  href={`https://wa.me/966501234567?text=${encodeURIComponent(isAr ? `السلام عليكم دكتور فيصل، بخصوص طلبي رقم ${application.applicationNumber}` : `Hello, regarding my application ${application.applicationNumber}`)}`}
+                  href={`https://wa.me/${(application.counselorPhone || '966501234567').replace(/\D/g, '')}?text=${encodeURIComponent(isAr ? `السلام عليكم، بخصوص طلبي رقم ${application.applicationNumber}` : `Hello, regarding my application ${application.applicationNumber}`)}`}
                   target="_blank"
                   rel="noreferrer"
                   className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"

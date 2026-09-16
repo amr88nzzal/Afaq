@@ -117,6 +117,9 @@ function formatApplicationForResponse(rawApp: any) {
       'طالب مؤهل لمسار الابتعاث والمنح الدراسية.',
       'تم التحقق من جاهزية الوثائق الأكاديمية.',
     ]),
+    counselorId: rawApp.counselorId !== undefined ? rawApp.counselorId?.toString() : (rawApp.staff_id ? rawApp.staff_id.toString() : undefined),
+    counselorName: rawApp.counselorName || rawApp.counselor_name || undefined,
+    counselorPhone: rawApp.counselorPhone || rawApp.counselor_phone || undefined,
   };
 }
 
@@ -160,7 +163,9 @@ router.get('/', async (req: Request, res: Response) => {
           co.name_en as "countryNameEn",
           co.code as "countryCode",
           -- Staff info
+          a.staff_id as "counselorId",
           us.name as "counselorName",
+          us.phone as "counselorPhone",
           -- Aggregated Documents
           COALESCE(
             (SELECT json_agg(d.*) FROM documents d WHERE d.application_id = a.id),
@@ -217,6 +222,9 @@ router.get('/:id', async (req: Request, res: Response) => {
           m.name_en as "majorNameEn",
           co.name_ar as "countryNameAr",
           co.name_en as "countryNameEn",
+          a.staff_id as "counselorId",
+          us.name as "counselorName",
+          us.phone as "counselorPhone",
           COALESCE((SELECT json_agg(d.*) FROM documents d WHERE d.application_id = a.id), '[]') as documents,
           COALESCE((SELECT json_agg(msg.*) FROM messages msg WHERE msg.application_id = a.id), '[]') as messages
         FROM applications a
@@ -224,6 +232,7 @@ router.get('/:id', async (req: Request, res: Response) => {
         LEFT JOIN universities u ON a.university_id = u.id
         LEFT JOIN majors m ON a.major_id = m.id
         LEFT JOIN countries co ON a.country_id = co.id
+        LEFT JOIN users us ON a.staff_id = us.id
         WHERE a.id::text = $1 OR a.application_number = $1
       `, [id]);
 
@@ -510,6 +519,13 @@ router.put('/:id', async (req: Request, res: Response) => {
       if (updateData.portalPassword) {
         await pool.query('UPDATE customers SET password_hash = $1 WHERE id = (SELECT customer_id FROM applications WHERE id = $2)', [updateData.portalPassword, numericId]);
       }
+      if (updateData.counselorId !== undefined || updateData.staffId !== undefined || updateData.staff_id !== undefined) {
+        const rawStaffId = updateData.counselorId || updateData.staffId || updateData.staff_id;
+        const newStaffId = rawStaffId ? Number(rawStaffId) : null;
+        if (newStaffId === null || !isNaN(newStaffId)) {
+          await pool.query('UPDATE applications SET staff_id = $1, updated_at = NOW() WHERE id = $2', [newStaffId, numericId]);
+        }
+      }
       if (Array.isArray(updateData.documents)) {
         for (const doc of updateData.documents) {
           if (doc.id && !isNaN(Number(doc.id))) {
@@ -533,6 +549,15 @@ router.put('/:id', async (req: Request, res: Response) => {
       (app as any).portalPassword = updateData.portalPassword;
     }
     if (updateData.notes) app.notes = updateData.notes;
+    if (updateData.counselorId !== undefined) {
+      (app as any).counselorId = updateData.counselorId;
+    }
+    if (updateData.counselorName !== undefined) {
+      (app as any).counselorName = updateData.counselorName;
+    }
+    if (updateData.counselorPhone !== undefined) {
+      (app as any).counselorPhone = updateData.counselorPhone;
+    }
     if (Array.isArray(updateData.documents)) {
       app.documents = updateData.documents;
     }

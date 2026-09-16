@@ -877,6 +877,9 @@ router.post('/portal-login', async (req: Request, res: Response) => {
           m.name_ar as "majorNameAr",
           m.name_en as "majorNameEn",
           co.name_ar as "countryNameAr",
+          a.staff_id as "counselorId",
+          us.name as "counselorName",
+          us.phone as "counselorPhone",
           COALESCE((SELECT json_agg(d.*) FROM documents d WHERE d.application_id = a.id), '[]') as documents,
           COALESCE((SELECT json_agg(msg.*) FROM messages msg WHERE msg.application_id = a.id), '[]') as messages
         FROM applications a
@@ -884,6 +887,7 @@ router.post('/portal-login', async (req: Request, res: Response) => {
         LEFT JOIN universities u ON a.university_id = u.id
         LEFT JOIN majors m ON a.major_id = m.id
         LEFT JOIN countries co ON a.country_id = co.id
+        LEFT JOIN users us ON a.staff_id = us.id
         WHERE (a.application_number = $1 OR c.email = $1)
           AND (c.password_hash = $2 OR $2 = '123456')
         LIMIT 1

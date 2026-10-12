@@ -14,6 +14,7 @@ import {
   HelpCircle,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Info
 } from 'lucide-react';
 
@@ -33,6 +34,12 @@ export const ConciergeServicesSection: React.FC<ConciergeServicesSectionProps> =
   const ArrowIcon = isAr ? ChevronLeft : ChevronRight;
 
   const [activeTab, setActiveTab] = useState<'all' | 'visa' | 'accommodation' | 'airport' | 'settlement'>('all');
+
+  // بطاقات الخدمات: قائمة "ما يشمله" مطويّة افتراضياً على الجوال فقط.
+  // السبب: أربع بطاقات × 3-4 بنود = ~600px من الطول بلا فائدة فورية —
+  // العنوان والسعر يكفيان للقرار الأول. على md فأعلى تبقى مفتوحة كما كانت.
+  const [openCards, setOpenCards] = useState<Record<string, boolean>>({});
+  const toggleCard = (id: string) => setOpenCards(prev => ({ ...prev, [id]: !prev[id] }));
 
   const getServiceIcon = (category: string) => {
     switch (category) {
@@ -119,7 +126,7 @@ export const ConciergeServicesSection: React.FC<ConciergeServicesSectionProps> =
                   : 'Completely free service supported directly through our direct university representative contracts.'}
               </p>
 
-              <div className="space-y-3 pt-2">
+              <div className="space-y-2 md:space-y-3 pt-2">
                 {[
                   isAr ? 'استشارات توجيه أكاديمي ومطابقة التخصص مع شروط الابتعاث' : 'Degree matching with GCC scholarship accreditations',
                   isAr ? 'مراجعة وتدقيق مستندات الطالب والسيرة الذاتية ورسالة الدافع' : 'SOP and document evaluation & verification',
@@ -311,7 +318,7 @@ export const ConciergeServicesSection: React.FC<ConciergeServicesSectionProps> =
                     </p>
                   </div>
 
-                  <div className="space-y-1.5 pt-2 border-t border-slate-800/60">
+                  <div id={`svc-details-${svc.id}`} className={`space-y-1.5 pt-2 border-t border-slate-800/60 ${openCards[String(svc.id)] ? 'block' : 'hidden'} md:block`}>
                     {(isAr ? svc.includedItemsAr : svc.includedItemsEn).map((inc, i) => (
                       <div key={i} className="flex items-center gap-1.5 text-xs text-slate-400">
                         <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
@@ -319,6 +326,27 @@ export const ConciergeServicesSection: React.FC<ConciergeServicesSectionProps> =
                       </div>
                     ))}
                   </div>
+
+                  {/* مفتاح الطي — جوال فقط (md وما فوق تظهر القائمة دائماً) */}
+                  <button
+                    onClick={() => toggleCard(String(svc.id))}
+                    aria-expanded={!!openCards[String(svc.id)]}
+                    aria-controls={`svc-details-${svc.id}`}
+                    className={`md:hidden w-full min-h-11 py-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${
+                      isDark
+                        ? 'border-slate-700 text-slate-300 hover:bg-slate-800'
+                        : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>
+                      {openCards[String(svc.id)]
+                        ? (isAr ? 'إخفاء التفاصيل' : 'Hide details')
+                        : (isAr
+                            ? `عرض ما يشمله (${(isAr ? svc.includedItemsAr : svc.includedItemsEn).length})`
+                            : `Show what's included (${(isAr ? svc.includedItemsAr : svc.includedItemsEn).length})`)}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 transition-transform ${openCards[String(svc.id)] ? 'rotate-180' : ''}`} aria-hidden="true" />
+                  </button>
                 </div>
 
                 <div className="pt-4 mt-4 border-t border-slate-800/60 flex items-center justify-between">

@@ -119,10 +119,12 @@ export const Footer: React.FC<FooterProps> = ({
 
       {/* Main Footer Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10">
+        {/* جوال: عمودان حتى يقف "الوجهات" و"الأنظمة" جنباً إلى جنب
+            (كانا مكدّسين فيستهلك الفوتر 1151px = 1.4 شاشة). من lg: شبكة 12 عموداً. */}
+        <div className="grid grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10">
           
           {/* Brand Info (4 cols) */}
-          <div className="lg:col-span-4 space-y-4">
+          <div className="col-span-2 lg:col-span-4 space-y-4">
             <LogoRenderer optionId={selectedLogoId} variant={isDark ? 'dark' : 'light'} />
             
             <p className="text-xs leading-relaxed max-w-sm opacity-85 font-medium">
@@ -156,7 +158,7 @@ export const Footer: React.FC<FooterProps> = ({
           </div>
 
           {/* Destination Quick Links (2 cols) */}
-          <div className="lg:col-span-2 space-y-3">
+          <div className="col-span-1 lg:col-span-2 space-y-3">
             <h4 className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
               {isAr ? 'الوجهات المعتمدة' : 'Destinations'}
             </h4>
@@ -190,7 +192,7 @@ export const Footer: React.FC<FooterProps> = ({
           </div>
 
           {/* Portals & Tools (3 cols) */}
-          <div className="lg:col-span-3 space-y-3">
+          <div className="col-span-1 lg:col-span-3 space-y-3">
             <h4 className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
               {isAr ? 'الأنظمة والخدمات' : 'Systems & Services'}
             </h4>
@@ -235,7 +237,7 @@ export const Footer: React.FC<FooterProps> = ({
           </div>
 
           {/* Regional Offices & Contact Info (3 cols) */}
-          <div className="lg:col-span-3 space-y-3">
+          <div className="col-span-2 lg:col-span-3 space-y-3">
             <h4 className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
               {isAr ? 'معلومات التواصل المباشر' : 'Direct Contact & Offices'}
             </h4>

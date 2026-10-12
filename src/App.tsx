@@ -390,10 +390,20 @@ export default function App() {
     });
   };
 
+  // شريط الإجراء الثابت على الجوال.
+  // السبب: صفحة الجوال طويلة (~13 شاشة)، فيضطر الطالب للعودة إلى أعلى الصفحة
+  // ليجد زر التقديم. الشريط يجعله متاحاً في أي موضع تمرير.
+  // يظهر في صفحات الموقع العامة فقط — لا في لوحات الطلاب أو الموظفين ولا
+  // أثناء فتح أي نافذة، حتى لا يغطّي محتوى يحتاج تفاعلاً.
+  const showStickyCta =
+    ['home', 'destinations', 'universities', 'research'].includes(activeView as string) &&
+    !isApplicationModalOpen &&
+    !isCounselorBookingOpen;
+
   return (
     <div className={`min-h-screen flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950 transition-colors duration-200 ${
       isDark ? 'bg-slate-950 text-slate-100 dark' : 'bg-slate-50 text-slate-900'
-    }`}>
+    } ${showStickyCta ? 'pb-24 lg:pb-0' : ''}`}>
       
       {/* Header & Navigation */}
       <Navbar
@@ -691,11 +701,14 @@ export default function App() {
                   </h2>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* جوال: شريط أفقي قابل للسحب. من md فأعلى: شبكة 3 أعمدة كما كانت.
+                    السبب: ثلاث شهادات مكدّسة تستهلك 897px = 1.1 شاشة كاملة على
+                    الجوال، بينما لا يقرأ الطالب عادةً أكثر من واحدة أو اثنتين. */}
+                <div className="-mx-4 px-4 flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 md:mx-0 md:px-0 md:pb-0 md:grid md:grid-cols-3 md:gap-6 md:overflow-visible">
                   {TESTIMONIALS.map((testi) => (
                     <div 
                       key={testi.id}
-                      className={`border rounded-2xl p-6 flex flex-col justify-between text-start space-y-4 shadow-lg transition-colors ${
+                      className={`border rounded-2xl p-6 flex flex-col justify-between text-start space-y-4 shadow-lg transition-colors shrink-0 w-[85%] snap-center md:w-auto md:shrink ${
                         isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
                       }`}
                     >
@@ -934,6 +947,24 @@ export default function App() {
         onDismiss={() => setActiveNotification(null)}
         lang={lang}
       />
+
+      {/* شريط الإجراء الثابت — جوال فقط.
+          يحلّ مشكلة طول الصفحة: زر التقديم متاح دائماً بلا حاجة للتمرير للأعلى.
+          pb بـ env(safe-area-inset-bottom) لتجنّب شريط الإيماءات في iPhone. */}
+      {showStickyCta && (
+        <div
+          className="lg:hidden fixed bottom-0 inset-x-0 z-40 px-3 pt-3 bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent"
+          style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+        >
+          <button
+            onClick={() => handleOpenApplicationWithCountry()}
+            className="w-full min-h-12 py-3 rounded-2xl font-black text-sm bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-2xl shadow-amber-500/30 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform cursor-pointer"
+          >
+            <GraduationCap className="w-5 h-5" aria-hidden="true" />
+            <span>{isAr ? 'قدم طلبك الجامعي مجاناً' : 'Apply Free — 100% Placement'}</span>
+          </button>
+        </div>
+      )}
 
     </div>
   );

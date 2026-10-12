@@ -1,0 +1,48 @@
+# ============================================================================
+#  إضافة cloudflared إلى نشر آفاق — الملف الأمثل: صفر منافذ منشورة
+#  Cloudflare Tunnel sidecar for the Afaq stack
+# ============================================================================
+#
+#  طريقة الاستخدام:
+#      docker compose -f docker-compose.yml -f cloudflared.compose.yml up -d
+#
+#  الفائدة الأساسية: cloudflared تتصل بحاوية afaq_frontend مباشرة عبر
+#  شبكة Docker الداخلية، فلا حاجة لنشر أي منفذ على المضيف إطلاقاً.
+#
+#  ⚠️ نتيجةً لذلك: يمكنك (ويُستحسن) حذف قسم ports بالكامل من خدمة
+#     afaq_frontend في docker-compose.yml، فيصبح السيرفر مغلقاً تماماً.
+# ============================================================================
+
+services:
+  afaq_cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: afaq_cloudflared
+    restart: unless-stopped
+
+    # ⛔ التوكن لا يُكتب هنا — يُقرأ من ملف .env على السيرفر:
+    #      CLOUDFLARE_TUNNEL_TOKEN=<التوكن من لوحة Cloudflare>
+    command: tunnel --no-autoupdate run
+
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+
+    # لا يحتاج أي منفذ — هو من يبدأ الاتصال الصادر
+    # (لا يوجد قسم ports هنا عن قصد)
+
+    networks:
+      - afaq_internal_net
+
+    security_opt:
+      - no-new-privileges:true
+
+    # إن فضّلت استخدام ملف config.yml + credentials.json بدل التوكن:
+    # volumes:
+    #   - /etc/cloudflared:/etc/cloudflared:ro
+    # command: tunnel --config /etc/cloudflared/config.yml run
+
+networks:
+  afaq_internal_net:
+    external: true
+    # ملاحظة: الشبكة أُنشئت بواسطة docker-compose.yml الأصلي، فاسمها الفعلي
+    # يعتمد على اسم المجلد. تحقّق بـ:  docker network ls | grep afaq
+    # إن اختلف الاسم، صحّحه هنا.

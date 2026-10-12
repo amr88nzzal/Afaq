@@ -33,8 +33,8 @@ export interface SiteSettings {
   announcement_banner_ar: string;
   announcement_banner_en: string;
   admin_notification_email: string;
-  telegram_bot_token: string;
-  telegram_chat_id: string;
+  // ملاحظة أمنية: أُزيلت حقول telegram_bot_token / telegram_chat_id من واجهة العميل.
+  // الخادم لم يعد يُرسلها (تُقنَّع إن وُجدت)، والأسرار تبقى في متغيّرات البيئة.
   theme_primary_color?: string;
   theme_contrast_mode?: string;
 }
@@ -56,12 +56,75 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   hero_subtitle_en: '100% Free Placement with Zero Agency Fees. Official and Certified Representative.',
   announcement_banner_ar: 'التسجيل مفتوح الآن للفصل الدراسي 2026/2027 مع منح تفوق تصل حتى 40% من الرسوم الدراسية',
   announcement_banner_en: 'Admissions now open for 2026/2027 intakes with merit scholarships up to 40% tuition reduction',
-  admin_notification_email: 'admin@amrodev.com, amr.nzzal@gmail.com',
-  telegram_bot_token: '',
-  telegram_chat_id: '',
+  admin_notification_email: 'admin@amrodev.com',
   theme_primary_color: 'amber',
   theme_contrast_mode: 'normal',
 };
+
+// ==========================================
+// 0. طبقة الاتصال الموحّدة (Shared Fetch Layer)
+// ==========================================
+
+/**
+ * كل نداءات الـ API تمرّ من هنا لإرسال كوكي الجلسة (httpOnly) مع كل طلب.
+ *
+ * ملاحظة أمنية مهمّة: لم يعد هناك أي رمز جلسة مخزَّن في localStorage أو
+ * sessionStorage. الجلسة كوكي httpOnly لا تستطيع الجافاسكربت قراءتها،
+ * فسرقتها عبر XSS غير ممكنة (بخلاف التخزين في المتصفح).
+ */
+export async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(input, { credentials: 'same-origin', ...init });
+}
+
+/** نتيجة موحّدة لفحص الجلسة */
+export interface SessionCheck<T> {
+  authenticated: boolean;
+  data?: T;
+  error?: string;
+}
+
+/** فحص جلسة الموظف من الخادم (المصدر الوحيد للحقيقة — لا sessionStorage) */
+export async function fetchCurrentStaffAPI(): Promise<SessionCheck<StaffUserEntity>> {
+  try {
+    const res = await apiFetch('/api/users/me');
+    if (!res.ok) return { authenticated: false };
+    const json = await res.json();
+    return { authenticated: true, data: json.user };
+  } catch {
+    return { authenticated: false, error: 'تعذّر الاتصال بالخادم' };
+  }
+}
+
+/** إنهاء جلسة الموظف على الخادم (يُبطل الرمز فعلياً، لا يخفي الواجهة فقط) */
+export async function logoutStaffAPI(): Promise<void> {
+  try {
+    await apiFetch('/api/users/logout', { method: 'POST' });
+  } catch {
+    /* تجاهل — الجلسة تنتهي على أي حال بانتهاء صلاحيتها */
+  }
+}
+
+/** فحص جلسة الطالب من الخادم */
+export async function fetchPortalSessionAPI(): Promise<SessionCheck<Application>> {
+  try {
+    const res = await apiFetch('/api/applications/portal-session');
+    if (!res.ok) return { authenticated: false };
+    const json = await res.json();
+    if (json.kind === 'staff') return { authenticated: false };
+    return { authenticated: true, data: json.data };
+  } catch {
+    return { authenticated: false, error: 'تعذّر الاتصال بالخادم' };
+  }
+}
+
+/** إنهاء جلسة الطالب على الخادم */
+export async function logoutPortalAPI(): Promise<void> {
+  try {
+    await apiFetch('/api/applications/portal-logout', { method: 'POST' });
+  } catch {
+    /* تجاهل */
+  }
+}
 
 // ==========================================
 // 1. إعدادات المنصة وقاعدة البيانات
@@ -69,7 +132,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
 
 export async function getSiteSettings(): Promise<{ settings: SiteSettings; source: string }> {
   try {
-    const res = await fetch('/api/settings');
+    const res = await apiFetch('/api/settings');
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
     const json = await res.json();
     return {
@@ -83,7 +146,7 @@ export async function getSiteSettings(): Promise<{ settings: SiteSettings; sourc
 
 export async function updateSiteSettings(updates: Partial<SiteSettings>): Promise<boolean> {
   try {
-    const res = await fetch('/api/settings', {
+    const res = await apiFetch('/api/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
@@ -97,7 +160,7 @@ export async function updateSiteSettings(updates: Partial<SiteSettings>): Promis
 
 export async function checkServerHealthAPI(): Promise<{ ok: boolean; postgres: boolean }> {
   try {
-    const res = await fetch('/api/health');
+    const res = await apiFetch('/api/health');
     if (!res.ok) return { ok: false, postgres: false };
     const json = await res.json();
     return { ok: true, postgres: json.postgresConnected === true };
@@ -112,7 +175,7 @@ export async function checkServerHealthAPI(): Promise<{ ok: boolean; postgres: b
 
 export async function fetchCountriesAPI(): Promise<CountryEntity[]> {
   try {
-    const res = await fetch('/api/countries');
+    const res = await apiFetch('/api/countries');
     const json = await res.json();
     return json.data || [];
   } catch (err) {
@@ -123,7 +186,7 @@ export async function fetchCountriesAPI(): Promise<CountryEntity[]> {
 
 export async function createCountryAPI(data: Partial<CountryEntity>): Promise<{ success: boolean; data?: CountryEntity; error?: string }> {
   try {
-    const res = await fetch('/api/countries', {
+    const res = await apiFetch('/api/countries', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -137,7 +200,7 @@ export async function createCountryAPI(data: Partial<CountryEntity>): Promise<{ 
 
 export async function updateCountryAPI(id: number, data: Partial<CountryEntity>): Promise<{ success: boolean; error?: string }> {
   try {
-    const res = await fetch(`/api/countries/${id}`, {
+    const res = await apiFetch(`/api/countries/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -151,7 +214,7 @@ export async function updateCountryAPI(id: number, data: Partial<CountryEntity>)
 
 export async function deleteCountryAPI(id: number): Promise<boolean> {
   try {
-    const res = await fetch(`/api/countries/${id}`, { method: 'DELETE' });
+    const res = await apiFetch(`/api/countries/${id}`, { method: 'DELETE' });
     const json = await res.json();
     return json.success === true;
   } catch {
@@ -166,7 +229,7 @@ export async function deleteCountryAPI(id: number): Promise<boolean> {
 export async function fetchUniversitiesAPI(countryId?: number): Promise<UniversityEntity[]> {
   try {
     const url = countryId ? `/api/universities?country_id=${countryId}` : '/api/universities';
-    const res = await fetch(url);
+    const res = await apiFetch(url);
     const json = await res.json();
     return json.data || [];
   } catch (err) {
@@ -177,7 +240,7 @@ export async function fetchUniversitiesAPI(countryId?: number): Promise<Universi
 
 export async function createUniversityAPI(data: Partial<UniversityEntity>): Promise<{ success: boolean; data?: UniversityEntity; error?: string }> {
   try {
-    const res = await fetch('/api/universities', {
+    const res = await apiFetch('/api/universities', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -191,7 +254,7 @@ export async function createUniversityAPI(data: Partial<UniversityEntity>): Prom
 
 export async function updateUniversityAPI(id: number, data: Partial<UniversityEntity>): Promise<{ success: boolean; error?: string }> {
   try {
-    const res = await fetch(`/api/universities/${id}`, {
+    const res = await apiFetch(`/api/universities/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -205,7 +268,7 @@ export async function updateUniversityAPI(id: number, data: Partial<UniversityEn
 
 export async function deleteUniversityAPI(id: number): Promise<boolean> {
   try {
-    const res = await fetch(`/api/universities/${id}`, { method: 'DELETE' });
+    const res = await apiFetch(`/api/universities/${id}`, { method: 'DELETE' });
     const json = await res.json();
     return json.success === true;
   } catch {
@@ -220,7 +283,7 @@ export async function deleteUniversityAPI(id: number): Promise<boolean> {
 export async function fetchMajorsAPI(universityId?: number): Promise<MajorEntity[]> {
   try {
     const url = universityId ? `/api/majors?university_id=${universityId}` : '/api/majors';
-    const res = await fetch(url);
+    const res = await apiFetch(url);
     const json = await res.json();
     return json.data || [];
   } catch (err) {
@@ -231,7 +294,7 @@ export async function fetchMajorsAPI(universityId?: number): Promise<MajorEntity
 
 export async function createMajorAPI(data: Partial<MajorEntity>): Promise<{ success: boolean; data?: MajorEntity; error?: string }> {
   try {
-    const res = await fetch('/api/majors', {
+    const res = await apiFetch('/api/majors', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -245,7 +308,7 @@ export async function createMajorAPI(data: Partial<MajorEntity>): Promise<{ succ
 
 export async function updateMajorAPI(id: number, data: Partial<MajorEntity>): Promise<{ success: boolean; error?: string }> {
   try {
-    const res = await fetch(`/api/majors/${id}`, {
+    const res = await apiFetch(`/api/majors/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -259,7 +322,7 @@ export async function updateMajorAPI(id: number, data: Partial<MajorEntity>): Pr
 
 export async function deleteMajorAPI(id: number): Promise<boolean> {
   try {
-    const res = await fetch(`/api/majors/${id}`, { method: 'DELETE' });
+    const res = await apiFetch(`/api/majors/${id}`, { method: 'DELETE' });
     const json = await res.json();
     return json.success === true;
   } catch {
@@ -273,7 +336,7 @@ export async function deleteMajorAPI(id: number): Promise<boolean> {
 
 export async function loginStaffAPI(username: string, password: string): Promise<{ success: boolean; user?: StaffUserEntity; error?: string; message?: string }> {
   try {
-    const res = await fetch('/api/users/login', {
+    const res = await apiFetch('/api/users/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
@@ -290,7 +353,7 @@ export async function loginStaffAPI(username: string, password: string): Promise
 
 export async function fetchStaffUsersAPI(): Promise<StaffUserEntity[]> {
   try {
-    const res = await fetch('/api/users');
+    const res = await apiFetch('/api/users');
     const json = await res.json();
     return json.data || [];
   } catch (err) {
@@ -300,7 +363,7 @@ export async function fetchStaffUsersAPI(): Promise<StaffUserEntity[]> {
 
 export async function createStaffUserAPI(data: any): Promise<{ success: boolean; data?: StaffUserEntity; error?: string }> {
   try {
-    const res = await fetch('/api/users', {
+    const res = await apiFetch('/api/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -313,7 +376,7 @@ export async function createStaffUserAPI(data: any): Promise<{ success: boolean;
 
 export async function updateStaffUserAPI(id: number, data: any): Promise<{ success: boolean; error?: string }> {
   try {
-    const res = await fetch(`/api/users/${id}`, {
+    const res = await apiFetch(`/api/users/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -326,7 +389,7 @@ export async function updateStaffUserAPI(id: number, data: any): Promise<{ succe
 
 export async function deleteStaffUserAPI(id: number): Promise<boolean> {
   try {
-    const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+    const res = await apiFetch(`/api/users/${id}`, { method: 'DELETE' });
     const json = await res.json();
     return json.success === true;
   } catch {
@@ -340,7 +403,7 @@ export async function deleteStaffUserAPI(id: number): Promise<boolean> {
 
 export async function fetchCustomersAPI(): Promise<CustomerEntity[]> {
   try {
-    const res = await fetch('/api/customers');
+    const res = await apiFetch('/api/customers');
     const json = await res.json();
     return json.data || [];
   } catch (err) {
@@ -354,7 +417,7 @@ export async function fetchCustomersAPI(): Promise<CustomerEntity[]> {
 
 export async function fetchMeetingsAPI(): Promise<MeetingEntity[]> {
   try {
-    const res = await fetch('/api/meetings');
+    const res = await apiFetch('/api/meetings');
     const json = await res.json();
     return json.data || [];
   } catch (err) {
@@ -364,7 +427,7 @@ export async function fetchMeetingsAPI(): Promise<MeetingEntity[]> {
 
 export async function bookMeetingAPI(data: Partial<MeetingEntity>): Promise<{ success: boolean; message?: string; data?: MeetingEntity; error?: string }> {
   try {
-    const res = await fetch('/api/meetings', {
+    const res = await apiFetch('/api/meetings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -377,7 +440,7 @@ export async function bookMeetingAPI(data: Partial<MeetingEntity>): Promise<{ su
 
 export async function updateMeetingAPI(id: number, data: Partial<MeetingEntity>): Promise<{ success: boolean; error?: string }> {
   try {
-    const res = await fetch(`/api/meetings/${id}`, {
+    const res = await apiFetch(`/api/meetings/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -394,7 +457,7 @@ export async function updateMeetingAPI(id: number, data: Partial<MeetingEntity>)
 
 export async function fetchCMSParagraphsAPI(): Promise<CMSParagraphEntity[]> {
   try {
-    const res = await fetch('/api/paragraphs');
+    const res = await apiFetch('/api/paragraphs');
     const json = await res.json();
     return json.data || [];
   } catch (err) {
@@ -404,7 +467,7 @@ export async function fetchCMSParagraphsAPI(): Promise<CMSParagraphEntity[]> {
 
 export async function updateCMSParagraphAPI(slug: string, data: Partial<CMSParagraphEntity>): Promise<{ success: boolean; error?: string }> {
   try {
-    const res = await fetch(`/api/paragraphs/${slug}`, {
+    const res = await apiFetch(`/api/paragraphs/${slug}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -421,7 +484,7 @@ export async function updateCMSParagraphAPI(slug: string, data: Partial<CMSParag
 
 export async function fetchApplicationsAPI(): Promise<Application[]> {
   try {
-    const res = await fetch('/api/applications');
+    const res = await apiFetch('/api/applications');
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
     const json = await res.json();
     return json.data || [];
@@ -433,7 +496,7 @@ export async function fetchApplicationsAPI(): Promise<Application[]> {
 
 export async function submitApplicationAPI(formData: any): Promise<{ success: boolean; applicationNumber: string; data?: Application; error?: string }> {
   try {
-    const res = await fetch('/api/applications', {
+    const res = await apiFetch('/api/applications', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(formData),
@@ -456,7 +519,7 @@ export async function submitApplicationAPI(formData: any): Promise<{ success: bo
 
 export async function updateApplicationFullAPI(appId: string, updates: Partial<Application>): Promise<boolean> {
   try {
-    const res = await fetch(`/api/applications/${appId}`, {
+    const res = await apiFetch(`/api/applications/${appId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
@@ -470,7 +533,7 @@ export async function updateApplicationFullAPI(appId: string, updates: Partial<A
 
 export async function updateApplicationStatusAPI(id: string, status: string, stageOrder?: number, note?: string, staffId?: number): Promise<boolean> {
   try {
-    const res = await fetch(`/api/applications/${id}/status`, {
+    const res = await apiFetch(`/api/applications/${id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status, note, stageOrder, staffId }),
@@ -484,7 +547,7 @@ export async function updateApplicationStatusAPI(id: string, status: string, sta
 
 export async function updateDocumentStatusAPI(appId: string, docId: number | string, status: string, feedback?: string): Promise<boolean> {
   try {
-    const res = await fetch(`/api/applications/${appId}/documents/${docId}`, {
+    const res = await apiFetch(`/api/applications/${appId}/documents/${docId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status, feedback }),
@@ -509,7 +572,7 @@ export async function uploadStudentDocumentAPI(
   }
 ): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
-    const res = await fetch(`/api/applications/${appId}/documents`, {
+    const res = await apiFetch(`/api/applications/${appId}/documents`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(docData),
@@ -524,7 +587,7 @@ export async function uploadStudentDocumentAPI(
 
 export async function deleteStudentDocumentAPI(appId: string, docId: string | number): Promise<boolean> {
   try {
-    const res = await fetch(`/api/applications/${appId}/documents/${docId}`, {
+    const res = await apiFetch(`/api/applications/${appId}/documents/${docId}`, {
       method: 'DELETE',
     });
     const json = await res.json();
@@ -536,7 +599,7 @@ export async function deleteStudentDocumentAPI(appId: string, docId: string | nu
 
 export async function studentPortalLoginAPI(loginId: string, password: string): Promise<{ success: boolean; data?: Application; error?: string }> {
   try {
-    const res = await fetch('/api/applications/portal-login', {
+    const res = await apiFetch('/api/applications/portal-login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ loginId, password }),
@@ -551,7 +614,7 @@ export async function studentPortalLoginAPI(loginId: string, password: string): 
 
 export async function updatePortalPasswordAPI(appId: string, newPassword: string): Promise<{ success: boolean; message?: string }> {
   try {
-    const res = await fetch(`/api/applications/${appId}/portal-password`, {
+    const res = await apiFetch(`/api/applications/${appId}/portal-password`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ newPassword }),
@@ -565,7 +628,7 @@ export async function updatePortalPasswordAPI(appId: string, newPassword: string
 
 export async function sendCredentialsEmailAPI(appId: string): Promise<{ success: boolean; message: string }> {
   try {
-    const res = await fetch(`/api/applications/${appId}/send-credentials`, {
+    const res = await apiFetch(`/api/applications/${appId}/send-credentials`, {
       method: 'POST',
     });
     const json = await res.json();
@@ -581,7 +644,7 @@ export async function sendCustomStudentResponseAPI(
   messageText: string
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
-    const res = await fetch(`/api/applications/${appId}/send-response`, {
+    const res = await apiFetch(`/api/applications/${appId}/send-response`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ channel, messageText }),
@@ -600,7 +663,7 @@ export async function sendCustomStudentResponseAPI(
 
 export async function fetchMessagesAPI(applicationId: string | number): Promise<any[]> {
   try {
-    const res = await fetch(`/api/messages?application_id=${encodeURIComponent(applicationId)}`);
+    const res = await apiFetch(`/api/messages?application_id=${encodeURIComponent(applicationId)}`);
     const json = await res.json();
     return json.data || [];
   } catch (err) {
@@ -618,7 +681,7 @@ export async function sendMessageAPI(msgData: {
   is_internal_note?: boolean;
 }): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
-    const res = await fetch('/api/messages', {
+    const res = await apiFetch('/api/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(msgData),

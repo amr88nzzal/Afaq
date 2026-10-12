@@ -191,23 +191,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     }
   };
 
-  const handleQuickDemoLogin = async (appNum: string, pass: string) => {
-    setLoginAppNumber(appNum);
-    setLoginPassword(pass);
-    setLoginLoading(true);
-    setLoginError('');
-
-    const res = await studentPortalLoginAPI(appNum, pass);
-    setLoginLoading(false);
-
-    if (res.success && res.data) {
-      if (onLoginSuccess) {
-        onLoginSuccess(res.data);
-      }
-    } else {
-      setLoginError(res.error || (isAr ? 'تعذر تسجيل الدخول بالطلب التجريبي' : 'Failed demo login'));
-    }
-  };
+  // ⛔ أُزيلت handleQuickDemoLogin التي كانت تُعبّئ بيانات دخول ثابتة
+  // (رقم طلب حقيقي + كلمة المرور 123456) داخل حزمة الجافاسكربت.
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -501,26 +486,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               </button>
             </form>
 
-            {/* Quick Demo Credentials Box for Testing */}
-            <div className={`mt-6 pt-5 border-t space-y-2 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-              <div className="text-[11px] font-bold text-slate-400">
-                {isAr ? 'تجربة سريعة (طلب تجريبي جاهز ومسجل في النظام):' : 'Quick Demo Access (Registered Application):'}
-              </div>
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin('AFQ-2026-8812', '123456')}
-                className={`w-full p-2.5 rounded-xl border text-xs flex items-center justify-between transition-colors ${
-                  isDark ? 'bg-slate-950 hover:bg-slate-800 border-slate-800 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
-                }`}
-              >
-                <div className="flex items-center gap-2 font-mono text-[11px]">
-                  <span className="font-bold text-amber-500">AFQ-2026-8812</span>
-                  <span className="text-slate-400">|</span>
-                  <span>{isAr ? 'عبدالرحمن العتيبي' : 'Abdulrahman Al-Otaibi'}</span>
-                </div>
-                <span className="text-[10px] font-bold text-emerald-500">{isAr ? 'دخول مباشر ➔' : 'Quick Access ➔'}</span>
-              </button>
-            </div>
+            {/* ⛔ أُزيل زر "الدخول التجريبي السريع" الذي كان يحمل
+                رقم طلب حقيقي وكلمة المرور 123456 داخل حزمة الجافاسكربت. */}
 
             {/* If no application submitted yet */}
             {onOpenApplyModal && (
@@ -589,11 +556,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                   {application.destination === 'uk' ? '🇬🇧 المملكة المتحدة' : application.destination === 'australia' ? '🇦🇺 أستراليا' : '🇳🇿 نيوزيلندا'}
                 </span>
 
-                {application.portalPassword && (
-                  <span className="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-mono">
-                    🔑 {isAr ? `رمز الدخول: ${application.portalPassword}` : `Pass: ${application.portalPassword}`}
-                  </span>
-                )}
+                {/* ⛔ أُزيل عرض كلمة مرور البوابة في الواجهة.
+                    الخادم لم يعد يُرسل كلمة المرور إطلاقاً (تُخزَّن مُشفَّرة).
+                    لتغييرها يستخدم الموظف زر "إصدار كلمة مرور جديدة". */}
               </div>
 
               <h1 className="text-2xl sm:text-3xl font-black">

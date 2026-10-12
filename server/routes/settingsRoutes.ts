@@ -2,22 +2,67 @@
  * ============================================================================
  * مسارات التحكم في إعدادات ومعطيات المنصة (Site Settings & Dynamic Content API)
  * ============================================================================
- * يسمح هذا المسار بقراءة وتعديل جميع أرقام الهواتف، الإيميلات، العناوين،
- * والنصوص العامة المخزنة في قاعدة البيانات (PostgreSQL) ليتم تعديلها
- * ديناميكياً من لوحة تحكم المشرف (Admin) أو برامج إدارة القواعد (pgAdmin).
+ * ملاحظات أمنية على هذه النسخة:
+ *   - GET /api/settings عام (لأن الموقع العام يحتاجه) لكنه يُخفي أي مفتاح
+ *     يبدو سرّياً. في النسخة السابقة كان SELECT * يُعيد telegram_bot_token
+ *     لأي زائر مجهول بمجرد أن يحفظه المشرف من لوحة التحكم.
+ *   - PUT /api/settings محصور بالمدير، ويرفض كتابة المفاتيح السرّية
+ *     (مكانها متغيّرات البيئة لا جدول الإعدادات العام).
+ *   - رُفضت مفاتيح التلويث النمطي (__proto__ وما شابه).
  */
 
 import { Router, Request, Response } from 'express';
 import { pool, isPostgresConnected, inMemoryStore, saveStoreToDisk } from '../db';
 import { cacheManager } from '../services/cacheManager';
+import { requireAdmin } from '../middleware/auth';
+import { failInternal } from '../middleware/security';
 
 const router = Router();
 
 /**
- * جلب جميع الإعدادات الحالية للموقع
+ * أي مفتاح يطابق هذا النمط لا يُعاد للعميل ولا يُقبل في الكتابة.
+ */
+const SECRET_KEY_PATTERN = /(token|secret|password|passwd|api[_-]?key|credential|private[_-]?key|chat[_-]?id)/i;
+
+/**
+ * قائمة صريحة بأسماء المفاتيح السرّية المعروفة في هذا المشروع.
+ * السبب: الاعتماد على النمط وحده لا يكفي — `telegram_chat_id` لا يحتوي كلمة
+ * token ولا secret، فكان يمرّ من الفلتر ويُسرَّب معرّف قناة الإدارة للعامة.
+ */
+const SECRET_KEY_NAMES = new Set([
+  'telegram_bot_token',
+  'telegram_chat_id',
+  'gmail_app_password',
+  'smtp_pass',
+  'smtp_password',
+  'gemini_api_key',
+]);
+
+function isSecretKey(key: string): boolean {
+  return SECRET_KEY_NAMES.has(key.toLowerCase()) || SECRET_KEY_PATTERN.test(key);
+}
+
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * إخفاء القيم السرّية في أي كائن إعدادات.
+ * المفاتيح السرّية تُحذف كلياً من الاستجابة (لا تُعاد حتى باسمها) — فلا يعرف
+ * الزائر المجهول أي أسرار مُهيّأة على السيرفر، ولا تُسرَّب قيمها.
+ */
+function redactSecrets(source: Record<string, any>): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const [key, value] of Object.entries(source)) {
+    if (isSecretKey(key)) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * جلب الإعدادات العامة للموقع (بدون أي قيم سرّية)
  * GET /api/settings
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', async (_req: Request, res: Response) => {
   try {
     const result = await cacheManager.getOrFetch(
       'settings',
@@ -25,27 +70,30 @@ router.get('/', async (req: Request, res: Response) => {
         if (isPostgresConnected) {
           let rows: any[] = [];
           try {
-            const queryRes = await pool.query('SELECT * FROM settings');
+            const queryRes = await pool.query(
+              'SELECT key, value, value_ar, value_en, value_numeric FROM settings'
+            );
             rows = queryRes.rows;
           } catch {
-            const queryRes2 = await pool.query('SELECT * FROM site_settings');
+            const queryRes2 = await pool.query(
+              'SELECT key, value, value_ar, value_en, value_numeric FROM site_settings'
+            );
             rows = queryRes2.rows;
           }
 
           const settingsObj: Record<string, any> = {};
-          rows.forEach(row => {
+          rows.forEach((row) => {
             const mainVal = row.value ?? row.value_ar ?? row.value_en ?? row.value_numeric;
             if (row.key) {
               settingsObj[row.key] = mainVal !== undefined && mainVal !== null ? String(mainVal) : '';
-
               if (row.value_ar) settingsObj[`${row.key}_ar`] = row.value_ar;
               if (row.value_en) settingsObj[`${row.key}_en`] = row.value_en;
             }
           });
 
-          return { ...inMemoryStore.settings, ...settingsObj };
+          return redactSecrets({ ...inMemoryStore.settings, ...settingsObj });
         }
-        return { ...inMemoryStore.settings };
+        return redactSecrets({ ...inMemoryStore.settings });
       },
       15 * 60 * 1000,
       isPostgresConnected ? 'postgres' : 'in-memory'
@@ -58,40 +106,68 @@ router.get('/', async (req: Request, res: Response) => {
       success: true,
       cached: result.isCached,
       source: result.isCached ? 'active-server-cache' : (isPostgresConnected ? 'postgres' : 'in-memory'),
-      data: result.data,
+      // التقنيع يُطبَّق هنا أيضاً وليس في مُنتِج الكاش فقط.
+      // السبب: معالج PUT يخزّن نسخة في الكاش، فلو خُزّنت غير مُقنَّعة لأعاد
+      // GET القيم السرّية من الكاش مباشرة متجاوزاً التقنيع.
+      data: redactSecrets(result.data as Record<string, any>),
       responseTimeMs: result.responseTimeMs,
     });
-  } catch (error: any) {
-    console.error('Error fetching settings:', error.message);
-    return res.status(200).json({ success: true, source: 'in-memory-fallback', data: inMemoryStore.settings });
+  } catch (error) {
+    console.error('Error fetching settings:', error);
+    return res.status(200).json({
+      success: true,
+      source: 'in-memory-fallback',
+      data: redactSecrets({ ...inMemoryStore.settings }),
+    });
   }
 });
 
 /**
- * تحديث الإعدادات (أرقام، بريد، عناوين، نصوص رئيسية)
+ * تحديث الإعدادات — للمدير فقط
  * PUT /api/settings
  */
-router.put('/', async (req: Request, res: Response) => {
+router.put('/', requireAdmin, async (req: Request, res: Response) => {
   try {
     const updates = req.body;
-    
-    if (!updates || typeof updates !== 'object') {
+
+    if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
       return res.status(400).json({ success: false, error: 'بيانات غير صالحة' });
     }
 
-    // Update in-memory store
-    inMemoryStore.settings = { ...inMemoryStore.settings, ...updates };
+    // تصفية المفاتيح: نرفض المفاتيح السرّية ومفاتيح التلويث النمطي
+    const accepted: Record<string, any> = {};
+    const rejected: string[] = [];
 
-    // تحديث قاعدة بيانات PostgreSQL إذا كانت متصلة
+    for (const [key, value] of Object.entries(updates)) {
+      if (FORBIDDEN_KEYS.has(key) || isSecretKey(key)) {
+        rejected.push(key);
+        continue;
+      }
+      accepted[key] = value;
+    }
+
+    if (rejected.length > 0) {
+      console.warn(`⚠️ [Settings] تم رفض مفاتيح محظورة: ${rejected.join(', ')}`);
+    }
+    if (Object.keys(accepted).length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'لا توجد حقول صالحة للتحديث. المفاتيح السرّية تُضبط من متغيرات البيئة لا من هنا.',
+      });
+    }
+
+    // تحديث المخزن في الذاكرة
+    inMemoryStore.settings = { ...inMemoryStore.settings, ...accepted };
+
     if (isPostgresConnected) {
-      for (const [k, v] of Object.entries(updates)) {
-        if (v && typeof v === 'object' && ('ar' in v || 'en' in v)) {
+      for (const [k, v] of Object.entries(accepted)) {
+        if (v && typeof v === 'object' && !Array.isArray(v) && ('ar' in v || 'en' in v)) {
           const valObj = v as any;
           await pool.query(
-            `INSERT INTO settings (key, value_ar, value_en, value_numeric, category) 
-             VALUES ($1, $2, $3, $4, $5) 
-             ON CONFLICT (key) DO UPDATE SET 
-               value_ar = EXCLUDED.value_ar, 
+            `INSERT INTO settings (key, value_ar, value_en, value_numeric, category)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (key) DO UPDATE SET
+               value_ar = EXCLUDED.value_ar,
                value_en = EXCLUDED.value_en,
                value_numeric = EXCLUDED.value_numeric,
                category = EXCLUDED.category`,
@@ -100,10 +176,10 @@ router.put('/', async (req: Request, res: Response) => {
         } else {
           const valStr = typeof v === 'string' ? v : JSON.stringify(v);
           await pool.query(
-            `INSERT INTO settings (key, value_ar, value_en, category) 
-             VALUES ($1, $2, $3, 'general') 
-             ON CONFLICT (key) DO UPDATE SET 
-               value_ar = EXCLUDED.value_ar, 
+            `INSERT INTO settings (key, value_ar, value_en, category)
+             VALUES ($1, $2, $3, 'general')
+             ON CONFLICT (key) DO UPDATE SET
+               value_ar = EXCLUDED.value_ar,
                value_en = EXCLUDED.value_en`,
             [k, valStr, valStr]
           );
@@ -111,30 +187,32 @@ router.put('/', async (req: Request, res: Response) => {
       }
     }
 
-    // إذا تم تعديل شريط التنبيه في الإعدادات، نحدث الفقرة المناظرة في inMemoryStore.paragraphs
-    if (updates.announcement_banner_ar || updates.announcement_banner_en) {
-      const annIndex = inMemoryStore.paragraphs.findIndex(p => p.slug === 'announcement' || p.slug === 'announcement_banner');
+    // إذا تم تعديل شريط التنبيه في الإعدادات، نحدّث الفقرة المناظرة
+    if (accepted.announcement_banner_ar || accepted.announcement_banner_en) {
+      const annIndex = inMemoryStore.paragraphs.findIndex(
+        (p) => p.slug === 'announcement' || p.slug === 'announcement_banner'
+      );
       if (annIndex >= 0) {
-        if (updates.announcement_banner_ar) inMemoryStore.paragraphs[annIndex].text_ar = updates.announcement_banner_ar;
-        if (updates.announcement_banner_en) inMemoryStore.paragraphs[annIndex].text_en = updates.announcement_banner_en;
+        if (accepted.announcement_banner_ar) inMemoryStore.paragraphs[annIndex].text_ar = accepted.announcement_banner_ar;
+        if (accepted.announcement_banner_en) inMemoryStore.paragraphs[annIndex].text_en = accepted.announcement_banner_en;
       }
     }
 
-    // حفظ التغييرات في القرص وإبطال وتحديث الذاكرة التشغيلية المؤقتة فوراً
     saveStoreToDisk();
     cacheManager.invalidate('settings');
     cacheManager.invalidate('paragraphs');
-    cacheManager.set('settings', inMemoryStore.settings, 15 * 60 * 1000);
+    // ⛔ لا تُخزَّن القيم السرّية في الكاش إطلاقاً — وإلا أعادها GET لاحقاً.
+    cacheManager.set('settings', redactSecrets({ ...inMemoryStore.settings }), 15 * 60 * 1000);
 
-    console.log('⚡ [Cache Invalidated & Updated] تم تحديث كاش إعدادات النظام فوراً:', Object.keys(updates));
+    console.log('⚡ [Cache Invalidated & Updated] تم تحديث كاش إعدادات النظام فوراً:', Object.keys(accepted));
     return res.json({
       success: true,
-      message: 'تم حفظ وتحديث الإعدادات بنجاح في قاعدة البيانات وتجديد الذاكرة التشغيلية',
-      data: inMemoryStore.settings
+      message: 'تم حفظ وتحديث الإعدادات بنجاح',
+      data: redactSecrets({ ...inMemoryStore.settings }),
+      ...(rejected.length > 0 ? { rejectedKeys: rejected } : {}),
     });
-  } catch (error: any) {
-    console.error('Error updating settings:', error.message);
-    return res.status(500).json({ success: false, error: error.message });
+  } catch (error) {
+    return failInternal(res, error);
   }
 });
 

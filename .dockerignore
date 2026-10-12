@@ -2,8 +2,38 @@ node_modules
 npm-debug.log
 .git
 .gitignore
-.env
 dist
 .vscode
 .idea
 *.log
+
+# ⛔ أسرار: استثنِ كل ملفات البيئة لا `.env` فقط.
+# النسخة السابقة استثنت `.env` بالاسم الدقيق، بينما Dockerfile يستخدم
+# `COPY . .` — أي أن `.env.local` أو `.env.production` كانت ستُنسخ داخل
+# طبقات الصورة وتبقى مقروءة منها للأبد.
+.env
+.env.*
+!.env.example
+
+# مفاتيح وشهادات
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+service-account*.json
+secrets*
+credentials*
+
+# بيانات التطبيق والملفات المرفوعة (تحتوي بيانات طلاب شخصية)
+server/data
+uploads
+public/uploads
+*.sqlite
+*.db
+*.dump
+*.bak

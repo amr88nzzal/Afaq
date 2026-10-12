@@ -6,8 +6,14 @@ services:
   # -------------------------------------------------------------
   afaq_db:
     image: postgres:16-alpine
-    ports:
-      - "5432:5432"
+    # ⛔ أُزيل نشر المنفذ 5432 على المضيف.
+    # كان `ports: ["5432:5432"]` ينشر قاعدة البيانات على كل واجهات الشبكة،
+    # وهذا يُلغي عزل الشبكة الداخلية ويجعل القاعدة قابلة للوصول من الإنترنت
+    # مباشرة متجاوزاً التطبيق وnginx.
+    # الحاويات تتواصل عبر afaq_internal_net، فلا حاجة لنشر المنفذ إطلاقاً.
+    # إن احتجت pgAdmin من جهازك مؤقتاً، اربطه بـ localhost فقط:
+    #   ports:
+    #     - "127.0.0.1:5432:5432"
     container_name: afaq_postgres
     restart: unless-stopped
     environment:
@@ -19,6 +25,8 @@ services:
       - ./server/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - afaq_internal_net
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
@@ -38,16 +46,24 @@ services:
       - NODE_ENV=production
       - PORT=5000
       - DATABASE_URL
+      - PG_SSL
+      - INITIAL_ADMIN_PASSWORD
       - GMAIL_USER
       - GMAIL_APP_PASSWORD
       - ADMIN_NOTIFICATION_EMAILS
       - TELEGRAM_BOT_TOKEN
       - TELEGRAM_CHAT_ID
+    volumes:
+      # مجلد المستندات المرفوعة: خارج public/ فلا يمكن الوصول إليه كملف ثابت.
+      # التنزيل يمرّ حصراً عبر مسار مُصرَّح يتحقق من ملكية الطلب.
+      - afaq_uploads:/app/server/data/uploads
     depends_on:
       afaq_db:
         condition: service_healthy
     networks:
       - afaq_internal_net
+    security_opt:
+      - no-new-privileges:true
 
   # -------------------------------------------------------------
   # خدمة الواجهة الأمامية (Nginx Frontend)
@@ -58,18 +74,32 @@ services:
       dockerfile: ./afaq-frontend/Dockerfile
     container_name: afaq_frontend
     restart: unless-stopped
+    # بيئة النشر: Cloudflare Tunnel + Zero Trust (لا اتصال وارد إلى السيرفر).
+    #
+    # 💡 تحسين مستحسن: إن كان cloudflared يعمل كحاوية في نفس الشبكة
+    #    (afaq_internal_net)، فأزل هذا القسم بالكامل ووجّه الـ tunnel إلى:
+    #        http://afaq_frontend:80
+    #    وبذلك تصبح صفر منافذ منشورة على المضيف — وهو الوضع الأمثل مع Tunnel.
+    #
+    #    وإن كان cloudflared يعمل على المضيف مباشرة (خارج Docker)، فأبقِ
+    #    الربط على localhost فقط بدل نشره على كل الواجهات:
+    #        ports:
+    #          - "127.0.0.1:3000:80"
     ports:
-      - "3000:80"
+      - "127.0.0.1:3000:80"
     depends_on:
       - afaq_backend
     networks:
       - afaq_internal_net
+    security_opt:
+      - no-new-privileges:true
 
 # الشبكات الداخلية
 networks:
   afaq_internal_net:
     driver: bridge
 
-# مساحة تخزين قاعدة البيانات المستمرة
+# مساحات التخزين المستمرة
 volumes:
   afaq_pgdata:
+  afaq_uploads:

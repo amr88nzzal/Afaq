@@ -233,18 +233,21 @@ ON CONFLICT (id) DO NOTHING;
 SELECT setval('majors_id_seq', (SELECT MAX(id) FROM majors));
 
 -- المستخدمين (المشرفين والمستشارين)
+-- ⚠️ لا تُزرع كلمات مرور نصاً صريحاً هنا. القيمة '!' تعني "حساب مقفل بلا كلمة مرور"
+--    ولا يمكن أن تطابق أي إدخال. اضبط INITIAL_ADMIN_PASSWORD في .env لتُهيّأ
+--    كلمة مرور المدير الأول تلقائياً عند أول إقلاع (تُشفَّر بـ scrypt).
 INSERT INTO users (id, name, email, phone, password_hash, telegram_id, role) VALUES
-(1, 'د. فيصل الشمري', 'faisal@afaq-global.amrodev.com', '+966 50 123 4567', 'afaq2026', '@dr_faisal_afaq', 'admin'),
-(2, 'أ. سارة المنصور', 'sara@afaq-global.amrodev.com', '+966 55 987 6543', 'afaq2026', '@sara_admissions', 'counselor'),
-(3, 'م. ريان القحطاني', 'rayan@afaq-global.amrodev.com', '+966 54 321 0987', 'afaq2026', '@rayan_uk', 'counselor')
+(1, 'د. فيصل الشمري', 'faisal@afaq-global.amrodev.com', '+966 50 123 4567', '!', '@dr_faisal_afaq', 'admin'),
+(2, 'أ. سارة المنصور', 'sara@afaq-global.amrodev.com', '+966 55 987 6543', '!', '@sara_admissions', 'counselor'),
+(3, 'م. ريان القحطاني', 'rayan@afaq-global.amrodev.com', '+966 54 321 0987', '!', '@rayan_uk', 'counselor')
 ON CONFLICT (id) DO NOTHING;
 SELECT setval('users_id_seq', (SELECT MAX(id) FROM users));
 
 -- العملاء (الطلاب)
 INSERT INTO customers (id, name, email, phone, whatsapp, password_hash, nationality, current_status) VALUES
-(1, 'عبدالرحمن محمد العتيبي', 'abdulrahman.o@example.com', '+966 50 111 2233', '+966 50 111 2233', '123456', 'Saudi', 'active'),
-(2, 'نورة عبدالله السديري', 'noura.s@example.com', '+966 55 444 5566', '+966 55 444 5566', '123456', 'Saudi', 'active'),
-(3, 'خالد فهد الشمري', 'khaled.f@example.com', '+965 99 888 777', '+965 99 888 777', '123456', 'Kuwaiti', 'active')
+(1, 'عبدالرحمن محمد العتيبي', 'abdulrahman.o@example.com', '+966 50 111 2233', '+966 50 111 2233', '!', 'Saudi', 'active'),
+(2, 'نورة عبدالله السديري', 'noura.s@example.com', '+966 55 444 5566', '+966 55 444 5566', '!', 'Saudi', 'active'),
+(3, 'خالد فهد الشمري', 'khaled.f@example.com', '+965 99 888 777', '+965 99 888 777', '!', 'Kuwaiti', 'active')
 ON CONFLICT (id) DO NOTHING;
 SELECT setval('customers_id_seq', (SELECT MAX(id) FROM customers));
 

@@ -7,11 +7,13 @@
 import { Router, Request, Response } from 'express';
 import { pool, isPostgresConnected, inMemoryStore } from '../db';
 import { cacheManager } from '../services/cacheManager';
+import { requireAdmin } from '../middleware/auth';
+import { failInternal } from '../middleware/security';
 
 const router = Router();
 
 /**
- * جلب جميع التخصصات مع إمكانية التصفية بحسب الجامعة أو الدرجة
+ * جلب جميع التخصصات مع إمكانية التصفية بحسب الجامعة أو الدرجة — عام
  * GET /api/majors?university_id=1
  */
 router.get('/', async (req: Request, res: Response) => {
@@ -78,15 +80,15 @@ router.get('/', async (req: Request, res: Response) => {
       responseTimeMs: result.responseTimeMs,
     });
   } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+    return failInternal(res, error);
   }
 });
 
 /**
- * إضافة تخصص أكاديمي جديد
+ * إضافة تخصص أكاديمي جديد — للمدير فقط
  * POST /api/majors
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requireAdmin, async (req: Request, res: Response) => {
   try {
     const { university_id, name_ar, name_en, category, degree_level, duration, annual_tuition } = req.body;
 
@@ -123,15 +125,15 @@ router.post('/', async (req: Request, res: Response) => {
 
     return res.status(201).json({ success: true, message: 'تم إضافة التخصص بنجاح وتحديث الكاش', data: createdData });
   } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+    return failInternal(res, error);
   }
 });
 
 /**
- * تعديل بيانات تخصص
+ * تعديل بيانات تخصص — للمدير فقط
  * PUT /api/majors/:id
  */
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
     const { university_id, name_ar, name_en, category, degree_level, duration, annual_tuition } = req.body;
@@ -156,8 +158,15 @@ router.put('/:id', async (req: Request, res: Response) => {
     } else {
       const index = inMemoryStore.majors.findIndex(m => m.id === id);
       if (index === -1) return res.status(404).json({ success: false, error: 'التخصص غير موجود' });
-      inMemoryStore.majors[index] = { ...inMemoryStore.majors[index], ...req.body };
-      updatedData = inMemoryStore.majors[index];
+      const target = inMemoryStore.majors[index] as any;
+      if (university_id !== undefined) target.university_id = Number(university_id);
+      if (name_ar !== undefined) target.name_ar = name_ar;
+      if (name_en !== undefined) target.name_en = name_en;
+      if (category !== undefined) target.category = category;
+      if (degree_level !== undefined) target.degree_level = degree_level;
+      if (duration !== undefined) target.duration = duration;
+      if (annual_tuition !== undefined) target.annual_tuition = annual_tuition;
+      updatedData = target;
     }
 
     cacheManager.invalidateByPrefix('majors');
@@ -165,15 +174,15 @@ router.put('/:id', async (req: Request, res: Response) => {
 
     return res.json({ success: true, message: 'تم تعديل التخصص بنجاح وتحديث الكاش', data: updatedData });
   } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+    return failInternal(res, error);
   }
 });
 
 /**
- * حذف تخصص
+ * حذف تخصص — للمدير فقط
  * DELETE /api/majors/:id
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', requireAdmin, async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
 
@@ -188,7 +197,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
     return res.json({ success: true, message: 'تم حذف التخصص بنجاح وتحديث الكاش' });
   } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+    return failInternal(res, error);
   }
 });
 

@@ -11,6 +11,8 @@ import {
   sendCustomStudentResponseAPI,
   checkServerHealthAPI,
   loginStaffAPI,
+  logoutStaffAPI,
+  fetchCurrentStaffAPI,
   fetchMessagesAPI,
   sendMessageAPI,
   fetchStaffUsersAPI
@@ -110,23 +112,34 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
 
-  // Current logged in staff user and auth state
-  const [currentUser, setCurrentUser] = useState<StaffUserEntity | null>(() => {
-    try {
-      const saved = sessionStorage.getItem('afaq_staff_user');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
+  // Current logged in staff user and auth state.
+  // ⛔ أُزيل الاعتماد على sessionStorage تماماً.
+  // السبب: sessionStorage مجرّد علم في المتصفح يمكن لأي شخص تعديله من DevTools
+  // (`sessionStorage.setItem('afaq_admin_auth','true')` كان يفتح اللوحة كاملة).
+  // المصدر الوحيد للحقيقة الآن هو جلسة الخادم عبر GET /api/users/me.
+  const [currentUser, setCurrentUser] = useState<StaffUserEntity | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isCheckingSession, setIsCheckingSession] = useState<boolean>(true);
 
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem('afaq_admin_auth') === 'true';
-    } catch {
-      return false;
-    }
-  });
+  // التحقق من الجلسة على الخادم عند أول تحميل
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const session = await fetchCurrentStaffAPI();
+      if (cancelled) return;
+      if (session.authenticated && session.data) {
+        setCurrentUser(session.data);
+        setIsAuthenticated(true);
+      } else {
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+      }
+      setIsCheckingSession(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Login form states
   const [usernameInput, setUsernameInput] = useState<string>('');
@@ -232,29 +245,12 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
       if (res.success && res.user) {
         setCurrentUser(res.user);
         setIsAuthenticated(true);
-        try {
-          sessionStorage.setItem('afaq_admin_auth', 'true');
-          sessionStorage.setItem('afaq_staff_user', JSON.stringify(res.user));
-        } catch {}
+        setLoginError(null);
       } else {
-        // Fallback check for demo master pin
-        if (passVal === 'afaq2026' || passVal === 'admin123') {
-          const fallbackUser: StaffUserEntity = {
-            id: 1,
-            name: userVal || (isAr ? 'مدير النظام' : 'System Administrator'),
-            email: userVal.includes('@') ? userVal : 'faisal@afaq-global.com',
-            role: 'admin',
-            is_active: true
-          };
-          setCurrentUser(fallbackUser);
-          setIsAuthenticated(true);
-          try {
-            sessionStorage.setItem('afaq_admin_auth', 'true');
-            sessionStorage.setItem('afaq_staff_user', JSON.stringify(fallbackUser));
-          } catch {}
-        } else {
-          setLoginError(res.error || (isAr ? 'اسم المستخدم أو كلمة المرور غير صحيحة' : 'Invalid username or password'));
-        }
+        // ⛔ أُزيل "الباب الخلفي" الذي كان يمنح جلسة مدير في المتصفح
+        // عند إدخال كلمة المرور العامة (afaq2026 / admin123) حتى لو رفض الخادم.
+        // الآن: إن رفض الخادم، لا توجد أي جلسة.
+        setLoginError(res.error || (isAr ? 'اسم المستخدم أو كلمة المرور غير صحيحة' : 'Invalid username or password'));
       }
     } catch {
       setLoginError(isAr ? 'تعذر التحقق من بيانات الدخول، تأكد من الاتصال بالخادم' : 'Failed to verify login credentials');
@@ -263,21 +259,13 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
     }
   };
 
-  const handleQuickPersonaSelect = (email: string, pass: string) => {
-    setUsernameInput(email);
-    setPasswordInput(pass);
-    setLoginError(null);
-  };
-
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // إبطال الجلسة على الخادم فعلياً (وليس إخفاء الواجهة فقط)
+    await logoutStaffAPI();
     setIsAuthenticated(false);
     setCurrentUser(null);
     setUsernameInput('');
     setPasswordInput('');
-    try {
-      sessionStorage.removeItem('afaq_admin_auth');
-      sessionStorage.removeItem('afaq_staff_user');
-    } catch {}
   };
 
   const handleMarkAlertRead = (alertId: string) => {
@@ -585,83 +573,6 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
               )}
             </button>
           </form>
-
-          {/* Quick Persona Demo Selector */}
-          <div className="pt-3 border-t border-slate-800/80 space-y-2">
-            <div className="text-[11px] font-bold text-slate-400 text-center">
-              {isAr ? '⚡ حسابات تجريبية سريعة بحسب الصلاحيات:' : '⚡ Quick Demo Personas (1-Click Fill):'}
-            </div>
-            <div className="grid grid-cols-1 gap-1.5 text-start">
-              <button
-                type="button"
-                onClick={() => handleQuickPersonaSelect('faisal@afaq-global.com', 'admin123')}
-                className={`p-2 rounded-xl border text-xs flex items-center justify-between transition-colors cursor-pointer ${
-                  usernameInput === 'faisal@afaq-global.com' 
-                    ? 'border-amber-500/60 bg-amber-500/10 text-amber-400' 
-                    : isDark ? 'border-slate-800 bg-slate-950/60 hover:border-slate-700 text-slate-300' : 'border-slate-200 bg-slate-50 hover:border-slate-300 text-slate-700'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-[10px]">
-                    <Crown className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <div className="font-bold text-[11px]">{isAr ? 'د. فيصل الشمري' : 'Dr. Faisal'}</div>
-                    <div className="text-[9px] text-slate-400">faisal@afaq-global.com</div>
-                  </div>
-                </div>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 font-semibold border border-purple-500/30">
-                  {isAr ? 'مدير عام (Admin)' : 'Admin'}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickPersonaSelect('sara@afaq-global.com', 'counselor123')}
-                className={`p-2 rounded-xl border text-xs flex items-center justify-between transition-colors cursor-pointer ${
-                  usernameInput === 'sara@afaq-global.com' 
-                    ? 'border-amber-500/60 bg-amber-500/10 text-amber-400' 
-                    : isDark ? 'border-slate-800 bg-slate-950/60 hover:border-slate-700 text-slate-300' : 'border-slate-200 bg-slate-50 hover:border-slate-300 text-slate-700'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-[10px]">
-                    <GraduationCap className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <div className="font-bold text-[11px]">{isAr ? 'أ. سارة المنصور' : 'Ms. Sara'}</div>
-                    <div className="text-[9px] text-slate-400">sara@afaq-global.com</div>
-                  </div>
-                </div>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 font-semibold border border-blue-500/30">
-                  {isAr ? 'مستشار أكاديمي' : 'Counselor'}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickPersonaSelect('tariq@afaq-global.com', 'staff123')}
-                className={`p-2 rounded-xl border text-xs flex items-center justify-between transition-colors cursor-pointer ${
-                  usernameInput === 'tariq@afaq-global.com' 
-                    ? 'border-amber-500/60 bg-amber-500/10 text-amber-400' 
-                    : isDark ? 'border-slate-800 bg-slate-950/60 hover:border-slate-700 text-slate-300' : 'border-slate-200 bg-slate-50 hover:border-slate-300 text-slate-700'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-[10px]">
-                    <UserCheck className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <div className="font-bold text-[11px]">{isAr ? 'م. طارق الخالدي' : 'Eng. Tariq'}</div>
-                    <div className="text-[9px] text-slate-400">tariq@afaq-global.com</div>
-                  </div>
-                </div>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-semibold border border-emerald-500/30">
-                  {isAr ? 'موظف قبولات' : 'Staff'}
-                </span>
-              </button>
-            </div>
-          </div>
 
           <div className="pt-3 border-t border-slate-800">
             <button

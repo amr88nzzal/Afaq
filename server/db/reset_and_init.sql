@@ -225,17 +225,19 @@ INSERT INTO majors (id, university_id, name_ar, name_en, category, degree_level,
 SELECT setval('majors_id_seq', (SELECT MAX(id) FROM majors));
 
 -- المستخدمين والمستشارين
+-- ⚠️ لا تُزرع كلمات مرور نصاً صريحاً. القيمة '!' = حساب مقفل بلا كلمة مرور.
+--    اضبط INITIAL_ADMIN_PASSWORD في .env لتُهيّأ كلمة مرور المدير الأول (scrypt).
 INSERT INTO users (id, name, email, phone, password_hash, telegram_id, role, is_active) VALUES
-(1, 'د. فيصل الشمري', 'faisal@afaq-global.com', '+966 50 123 4567', 'admin123', '@faisal_afaq', 'admin', true),
-(2, 'أ. سارة المنصور', 'sara@afaq-global.com', '+966 55 987 6543', 'counselor123', '@sara_counselor', 'counselor', true),
-(3, 'م. طارق الخالدي', 'tariq@afaq-global.com', '+966 54 321 0987', 'staff123', '@tariq_admissions', 'staff', true);
+(1, 'د. فيصل الشمري', 'faisal@afaq-global.com', '+966 50 123 4567', '!', '@faisal_afaq', 'admin', true),
+(2, 'أ. سارة المنصور', 'sara@afaq-global.com', '+966 55 987 6543', '!', '@sara_counselor', 'counselor', true),
+(3, 'م. طارق الخالدي', 'tariq@afaq-global.com', '+966 54 321 0987', '!', '@tariq_admissions', 'staff', true);
 SELECT setval('users_id_seq', (SELECT MAX(id) FROM users));
 
 -- العملاء والطلاب
 INSERT INTO customers (id, name, email, phone, whatsapp, password_hash, nationality, current_status) VALUES
-(1, 'عبدالرحمن محمد العتيبي', 'abdulrahman.o@example.com', '+966 50 111 2233', '+966 50 111 2233', 'pass123', 'سعودي', 'active'),
-(2, 'نورة عبدالله السديري', 'noura.s@example.com', '+966 55 444 5566', '+966 55 444 5566', 'pass123', 'سعودية', 'active'),
-(3, 'خالد فهد الدوسري', 'khaled.d@example.com', '+966 56 777 8899', '+966 56 777 8899', 'pass123', 'كويتي', 'active');
+(1, 'عبدالرحمن محمد العتيبي', 'abdulrahman.o@example.com', '+966 50 111 2233', '+966 50 111 2233', '!', 'سعودي', 'active'),
+(2, 'نورة عبدالله السديري', 'noura.s@example.com', '+966 55 444 5566', '+966 55 444 5566', '!', 'سعودية', 'active'),
+(3, 'خالد فهد الدوسري', 'khaled.d@example.com', '+966 56 777 8899', '+966 56 777 8899', '!', 'كويتي', 'active');
 SELECT setval('customers_id_seq', (SELECT MAX(id) FROM customers));
 
 -- الطلبات

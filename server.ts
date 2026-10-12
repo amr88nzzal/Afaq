@@ -2,6 +2,12 @@
  * ============================================================================
  * خادم الويب والتطبيق المدمج (Afaq Global Express + Vite Full-Stack Server)
  * ============================================================================
+ * ملاحظات أمنية على هذه النسخة:
+ *   - رؤوس حماية على كل الاستجابات (securityHeaders).
+ *   - مجلد الملفات المرفوعة لم يعد مخدوماً كملفات ثابتة، وأي طلب لـ /uploads
+ *     يُرفض صراحةً — تُقدَّم المستندات فقط عبر مسار مُصرَّح يتحقق من الملكية.
+ *   - نقطة /api/health لم تعد تكشف اسم الخدمة ولا الدومين ولا إحصاءات الكاش.
+ *   - trust proxy مُفعَّل حتى يعمل تحديد المعدّل بشكل صحيح خلف nginx.
  */
 
 import express from 'express';
@@ -9,6 +15,7 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { testDbConnection, isPostgresConnected } from './server/db';
 import { cacheManager } from './server/services/cacheManager';
+import { securityHeaders } from './server/middleware/security';
 import settingsRoutes from './server/routes/settingsRoutes';
 import universitiesRoutes from './server/routes/universitiesRoutes';
 import applicationsRoutes from './server/routes/applicationsRoutes';
@@ -25,6 +32,26 @@ async function startServer() {
   const app = express();
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
+  // سلسلة الوكلاء في بيئة النشر (Cloudflare Tunnel + Zero Trust):
+  //   المتصفح → حافة Cloudflare → cloudflared → nginx → هذا الخادم
+  // عدد القفزات الموثوقة يُضبط عبر TRUST_PROXY (افتراضياً 1 = nginx).
+  //
+  // ملاحظة مهمّة: تحديد المعدّل لا يعتمد على req.ip بل على ترويسة
+  // CF-Connecting-IP التي تكتبها حافة Cloudflare وتستبدلها دائماً،
+  // فلا يمكن للعميل تزويرها — بخلاف X-Forwarded-For.
+  const trustProxyEnv = process.env.TRUST_PROXY;
+  if (trustProxyEnv !== undefined && trustProxyEnv !== '') {
+    const asNumber = Number(trustProxyEnv);
+    const isNumeric = Number.isFinite(asNumber) && asNumber > 0;
+    app.set('trust proxy', isNumeric ? asNumber : trustProxyEnv === 'true');
+  } else {
+    app.set('trust proxy', 1);
+  }
+  app.disable('x-powered-by');
+
+  // رؤوس الحماية على كل الاستجابات
+  app.use(securityHeaders);
+
   // قراءة مدخلات الـ JSON والنماذج في الطلبات
   app.use(express.json({ limit: '15mb' }));
   app.use(express.urlencoded({ extended: true, limit: '15mb' }));
@@ -34,19 +61,17 @@ async function startServer() {
 
   // --------------------------------------------------------------------------
   // مسارات واجهة برمجة التطبيقات (RESTful API Routes)
+  // الصلاحيات تُطبَّق داخل كل مسار حسب نوعه (عام / موظف / مدير)
   // --------------------------------------------------------------------------
-  app.get('/api/health', (req, res) => {
+  app.get('/api/health', (_req, res) => {
+    // لا نكشف أي تفاصيل داخلية — فقط حالة عامة
     res.json({
       status: 'ok',
-      service: 'Afaq Global Education API',
-      domain: 'afaq-global.amrodev.com',
       postgresConnected: isPostgresConnected,
-      cacheEngineStats: cacheManager.getStats(),
       timestamp: new Date().toISOString(),
     });
   });
 
-  // مسارات الجداول الأساسية والذاكرة المؤقتة
   app.use('/api/settings', settingsRoutes);
   app.use('/api/countries', countriesRoutes);
   app.use('/api/universities', universitiesRoutes);
@@ -60,16 +85,20 @@ async function startServer() {
   app.use('/api/cache', cacheRoutes);
 
   // --------------------------------------------------------------------------
-  // خدمة الملفات الثابتة والصور الرسمية والملفات المرفوعة (Public Static Assets & Images)
+  // خدمة الملفات الثابتة والصور الرسمية (Public Static Assets & Images)
   // --------------------------------------------------------------------------
   const publicPath = path.join(process.cwd(), 'public');
-  const rootUploadsPath = path.join(process.cwd(), 'uploads');
-  const publicUploadsPath = path.join(publicPath, 'uploads');
+
+  // ⛔ منع الوصول المباشر لأي ملف مرفوع.
+  // السبب: المستندات المرفوعة تحتوي جوازات سفر وكشوف درجات، وكانت مخدومة
+  // كملفات ثابتة لأي زائر. التنزيل الآن يمرّ حصراً عبر
+  // GET /api/applications/:id/documents/:docId/file بعد التحقق من الملكية.
+  app.use(['/uploads', '/images/uploads', '/public/uploads'], (_req, res) => {
+    res.status(404).json({ success: false, error: 'غير متاح' });
+  });
 
   app.use(express.static(publicPath));
   app.use('/images', express.static(path.join(publicPath, 'images')));
-  app.use('/uploads', express.static(publicUploadsPath));
-  app.use('/uploads', express.static(rootUploadsPath));
 
   // --------------------------------------------------------------------------
   // خادم الواجهة الأمامية (Vite Middleware in Dev / Static Files in Prod)
@@ -86,18 +115,25 @@ async function startServer() {
     // وضع الإنتاج (Production)
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
     console.log('📦 [Static] يتم تقديم ملفات الإنتاج المجمعة من مجلد dist/');
   }
 
-  // الاستماع على المنفذ المعتمد 3000 وربط المضيف 0.0.0.0
+  // معالج أخطاء موحّد — لا يكشف تفاصيل داخلية للعميل
+  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error('❌ [Server] خطأ غير معالَج:', err?.message || err);
+    if (res.headersSent) return;
+    res.status(500).json({ success: false, error: 'حدث خطأ في الخادم، حاول لاحقاً' });
+  });
+
+  // الاستماع على المنفذ المعتمد وربط المضيف 0.0.0.0
   app.listen(PORT, '0.0.0.0', () => {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log(`🚀 خادم آفاق العالمية يعمل بنجاح على المنفذ: ${PORT}`);
-    console.log(`🌐 الدومين المعتمد: https://afaq-global.amrodev.com`);
     console.log(`🔌 واجهة الـ API: http://localhost:${PORT}/api/health`);
+    console.log(`📊 عناصر الكاش النشطة: ${JSON.stringify(cacheManager.getStats())}`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   });
 }

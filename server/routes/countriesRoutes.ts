@@ -7,14 +7,16 @@
 import { Router, Request, Response } from 'express';
 import { pool, isPostgresConnected, inMemoryStore } from '../db';
 import { cacheManager } from '../services/cacheManager';
+import { requireAdmin } from '../middleware/auth';
+import { failInternal } from '../middleware/security';
 
 const router = Router();
 
 /**
- * جلب جميع الدول والوجهات الدراسية
+ * جلب جميع الدول والوجهات الدراسية — عام (يقرأه الموقع العام)
  * GET /api/countries
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', async (_req: Request, res: Response) => {
   try {
     const result = await cacheManager.getOrFetch(
       'countries',
@@ -39,17 +41,17 @@ router.get('/', async (req: Request, res: Response) => {
       data: result.data,
       responseTimeMs: result.responseTimeMs,
     });
-  } catch (error: any) {
-    console.error('Error fetching countries:', error.message);
-    return res.status(500).json({ success: false, error: error.message, data: inMemoryStore.countries });
+  } catch (error) {
+    console.error('Error fetching countries:', error);
+    return res.status(200).json({ success: true, source: 'in-memory-fallback', data: inMemoryStore.countries });
   }
 });
 
 /**
- * إضافة دولة دراسية جديدة
+ * إضافة دولة دراسية جديدة — للمدير فقط
  * POST /api/countries
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requireAdmin, async (req: Request, res: Response) => {
   try {
     const { code, name_ar, name_en, info_ar, info_en, image_url, is_active } = req.body;
 
@@ -84,15 +86,15 @@ router.post('/', async (req: Request, res: Response) => {
     cacheManager.invalidate('countries');
     return res.status(201).json({ success: true, message: 'تم إضافة الدولة بنجاح', data: createdData });
   } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+    return failInternal(res, error);
   }
 });
 
 /**
- * تعديل بيانات دولة
+ * تعديل بيانات دولة — للمدير فقط
  * PUT /api/countries/:id
  */
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
     const { code, name_ar, name_en, info_ar, info_en, image_url, is_active } = req.body;
@@ -126,22 +128,29 @@ router.put('/:id', async (req: Request, res: Response) => {
     } else {
       const index = inMemoryStore.countries.findIndex(c => Number(c.id) === id);
       if (index === -1) return res.status(404).json({ success: false, error: 'الدولة غير موجودة' });
-      inMemoryStore.countries[index] = { ...inMemoryStore.countries[index], ...req.body };
-      updatedData = inMemoryStore.countries[index];
+      const target = inMemoryStore.countries[index] as any;
+      if (code !== undefined) target.code = code;
+      if (name_ar !== undefined) target.name_ar = name_ar;
+      if (name_en !== undefined) target.name_en = name_en;
+      if (info_ar !== undefined) target.info_ar = info_ar;
+      if (info_en !== undefined) target.info_en = info_en;
+      if (image_url !== undefined) target.image_url = image_url;
+      if (is_active !== undefined) target.is_active = is_active;
+      updatedData = target;
     }
 
     cacheManager.invalidate('countries');
     return res.json({ success: true, message: 'تم تعديل الدولة بنجاح', data: updatedData });
   } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+    return failInternal(res, error);
   }
 });
 
 /**
- * حذف دولة
+ * حذف دولة — للمدير فقط
  * DELETE /api/countries/:id
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', requireAdmin, async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
 
@@ -167,7 +176,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
     return res.json({ success: true, message: 'تم حذف الدولة بنجاح' });
   } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+    return failInternal(res, error);
   }
 });
 

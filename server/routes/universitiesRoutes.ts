@@ -7,11 +7,13 @@
 import { Router, Request, Response } from 'express';
 import { pool, isPostgresConnected, inMemoryStore } from '../db';
 import { cacheManager } from '../services/cacheManager';
+import { requireAdmin } from '../middleware/auth';
+import { failInternal } from '../middleware/security';
 
 const router = Router();
 
 /**
- * جلب قائمة الجامعات مع إمكانية التصفية بحسب الدولة
+ * جلب قائمة الجامعات مع إمكانية التصفية بحسب الدولة — عام
  * GET /api/universities?country_id=1
  */
 router.get('/', async (req: Request, res: Response) => {
@@ -76,12 +78,12 @@ router.get('/', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error fetching universities:', error.message);
-    return res.status(500).json({ success: false, error: error.message });
+    return failInternal(res, error);
   }
 });
 
 /**
- * جلب تفاصيل جامعة معينة
+ * جلب تفاصيل جامعة معينة — عام
  * GET /api/universities/:id
  */
 router.get('/:id', async (req: Request, res: Response) => {
@@ -130,15 +132,15 @@ router.get('/:id', async (req: Request, res: Response) => {
       responseTimeMs: result.responseTimeMs,
     });
   } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+    return failInternal(res, error);
   }
 });
 
 /**
- * إضافة جامعة جديدة
+ * إضافة جامعة جديدة — للمدير فقط
  * POST /api/universities
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requireAdmin, async (req: Request, res: Response) => {
   try {
     const {
       country_id, name_ar, name_en, city_ar, city_en,
@@ -193,15 +195,15 @@ router.post('/', async (req: Request, res: Response) => {
     cacheManager.invalidateByPrefix('universities');
     return res.status(201).json({ success: true, message: 'تم إضافة الجامعة بنجاح وتحديث الكاش', data: createdData });
   } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+    return failInternal(res, error);
   }
 });
 
 /**
- * تعديل بيانات جامعة
+ * تعديل بيانات جامعة — للمدير فقط
  * PUT /api/universities/:id
  */
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
     const {
@@ -241,22 +243,35 @@ router.put('/:id', async (req: Request, res: Response) => {
     } else {
       const index = inMemoryStore.universities.findIndex(u => u.id === id);
       if (index === -1) return res.status(404).json({ success: false, error: 'الجامعة غير موجودة' });
-      inMemoryStore.universities[index] = { ...inMemoryStore.universities[index], ...req.body };
-      updatedData = inMemoryStore.universities[index];
+      const target = inMemoryStore.universities[index] as any;
+      if (country_id !== undefined) target.country_id = Number(country_id);
+      if (name_ar !== undefined) target.name_ar = name_ar;
+      if (name_en !== undefined) target.name_en = name_en;
+      if (city_ar !== undefined) target.city_ar = city_ar;
+      if (city_en !== undefined) target.city_en = city_en;
+      if (details_ar !== undefined) target.details_ar = details_ar;
+      if (details_en !== undefined) target.details_en = details_en;
+      if (cost_info !== undefined) target.cost_info = cost_info;
+      if (ranking !== undefined) target.ranking = parseInt(ranking, 10);
+      if (acceptance_rate !== undefined) target.acceptance_rate = acceptance_rate;
+      if (featured !== undefined) target.featured = featured;
+      if (website_url !== undefined) target.website_url = website_url;
+      if (image_url !== undefined) target.image_url = image_url;
+      updatedData = target;
     }
 
     cacheManager.invalidateByPrefix('universities');
     return res.json({ success: true, message: 'تم تعديل الجامعة بنجاح وتحديث الكاش', data: updatedData });
   } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+    return failInternal(res, error);
   }
 });
 
 /**
- * حذف جامعة
+ * حذف جامعة — للمدير فقط
  * DELETE /api/universities/:id
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', requireAdmin, async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
 
@@ -270,7 +285,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     cacheManager.invalidateByPrefix('universities');
     return res.json({ success: true, message: 'تم حذف الجامعة بنجاح وتحديث الكاش' });
   } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+    return failInternal(res, error);
   }
 });
 

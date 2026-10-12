@@ -5,14 +5,45 @@
  */
 
 import { Router, Request, Response } from 'express';
-import fs from 'fs';
-import path from 'path';
+import crypto from 'crypto';
 import { pool, isPostgresConnected, inMemoryStore, saveStoreToDisk } from '../db';
 import { sendStudentCredentialsEmail, sendStatusUpdateNotification, sendCustomStudentEmailResponse } from '../services/emailService';
 import { sendTelegramNotification } from '../services/telegramService';
-import { saveUploadedDocument } from '../utils/fileStorage';
+import { saveUploadedDocument, resolveStoredFile, deleteStoredFile } from '../utils/fileStorage';
+import { hashPassword, verifyPassword, generateStrongPassword } from '../services/passwordService';
+import {
+  createSession,
+  destroySession,
+  destroySessionsForApplication,
+  STUDENT_SESSION_TTL_MS,
+} from '../services/sessionService';
+import {
+  requireAuth,
+  requireStaff,
+  requireAdmin,
+  canAccessApplication,
+  isStaff,
+  sessionCookieOptions,
+  SESSION_COOKIE_NAME,
+} from '../middleware/auth';
+import { rateLimit, fail, failInternal } from '../middleware/security';
 
 const router = Router();
+
+/** استخراج المعرّف الرقمي للطلب من قاعدة البيانات (يقبل الرقم أو رقم الطلب) */
+async function resolveApplicationId(idOrNumber: string): Promise<number | null> {
+  if (!isPostgresConnected) {
+    const app = inMemoryStore.applications.find(
+      (a) => a.id.toString() === idOrNumber || a.application_number === idOrNumber
+    );
+    return app ? app.id : null;
+  }
+  const result = await pool.query(
+    'SELECT id FROM applications WHERE id::text = $1 OR application_number = $1 LIMIT 1',
+    [idOrNumber]
+  );
+  return result.rows.length > 0 ? result.rows[0].id : null;
+}
 
 // Helper to generate the 7-stage roadmap for an application
 function generateDefaultTimeline(status: string) {
@@ -59,7 +90,8 @@ function formatApplicationForResponse(rawApp: any) {
   const studentEmail = rawApp.studentEmail || rawApp.customer_email || rawApp.student_email || 'student@afaq-global.com';
   const studentPhone = rawApp.studentPhone || rawApp.customer_phone || rawApp.student_phone || '+966 50 123 9876';
   const studentWhatsapp = rawApp.studentWhatsapp || rawApp.customer_whatsapp || rawApp.whatsapp || studentPhone;
-  const portalPassword = rawApp.portalPassword || rawApp.password_hash || rawApp.portal_password || '123456';
+  // ⛔ لا تُشتقّ كلمة مرور البوابة ولا تُعاد في أي استجابة.
+  // (كان هذا السطر سابقاً يُعيد كلمة مرور الطالب نصاً صريحاً مع كل طلب.)
   
   const universityName = rawApp.universityName || rawApp.universityNameAr || rawApp.university_name_ar || rawApp.university_name_en || 'University of Manchester';
   const courseName = rawApp.courseName || rawApp.majorNameAr || rawApp.major_name_ar || rawApp.major_name_en || 'علوم الحاسب والذكاء الاصطناعي';
@@ -89,7 +121,7 @@ function formatApplicationForResponse(rawApp: any) {
     };
   });
 
-  return {
+  const formatted = {
     ...rawApp,
     id: rawApp.id ? rawApp.id.toString() : 'app-001',
     applicationNumber: appNumber,
@@ -101,8 +133,6 @@ function formatApplicationForResponse(rawApp: any) {
     customer_name: studentName,
     customer_email: studentEmail,
     customer_phone: studentPhone,
-    portalPassword,
-    portal_password: portalPassword,
     destination: rawApp.destination || (rawApp.country_id === 2 ? 'australia' : rawApp.country_id === 3 ? 'newzealand' : 'uk'),
     countryNameAr: rawApp.countryNameAr || rawApp.country_name_ar || 'المملكة المتحدة',
     universityName,
@@ -121,13 +151,24 @@ function formatApplicationForResponse(rawApp: any) {
     counselorName: rawApp.counselorName || rawApp.counselor_name || undefined,
     counselorPhone: rawApp.counselorPhone || rawApp.counselor_phone || undefined,
   };
+
+  // ⛔ حماية نهائية: نُزيل أي حقل يبدو كحقل كلمة مرور قبل إرجاع الاستجابة.
+  // السبب: `...rawApp` تمرّر كل حقول الكائن المصدر، فأي مصدر يحتوي
+  // portal_password أو password_hash كان سيتسرّب تلقائياً (حدث فعلاً في
+  // مسار الذاكرة المتكاملة). هذا الفلتر يضمن عدم تكرار الخطأ مستقبلاً.
+  const safe: Record<string, any> = {};
+  for (const [key, value] of Object.entries(formatted)) {
+    if (/password|passwd|secret|token/i.test(key)) continue;
+    safe[key] = value;
+  }
+  return safe;
 }
 
 /**
  * جلب جميع طلبات القبول مع بيانات الطلاب والجامعات والمستندات
- * GET /api/applications
+ * GET /api/applications — للموظفين فقط (تحتوي بيانات شخصية لكل الطلاب)
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', requireStaff(), async (req: Request, res: Response) => {
   try {
     if (isPostgresConnected) {
       const result = await pool.query(`
@@ -149,7 +190,6 @@ router.get('/', async (req: Request, res: Response) => {
           c.email as "studentEmail",
           c.phone as "studentPhone",
           c.whatsapp as "studentWhatsapp",
-          c.password_hash as "portalPassword",
           c.nationality,
           -- University & Major info
           u.id as "universityId",
@@ -194,15 +234,15 @@ router.get('/', async (req: Request, res: Response) => {
     return res.json({ success: true, source: 'in-memory', data: formattedList });
   } catch (error: any) {
     console.error('Error fetching applications:', error.message);
-    return res.status(500).json({ success: false, error: error.message });
+    return failInternal(res, error);
   }
 });
 
 /**
  * جلب تفاصيل طلب واحد برقم الطلب أو المعرف
- * GET /api/applications/:id
+ * GET /api/applications/:id — للموظفين، أو للطالب صاحب الطلب فقط
  */
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', requireAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -215,7 +255,6 @@ router.get('/:id', async (req: Request, res: Response) => {
           c.email as "studentEmail",
           c.phone as "studentPhone",
           c.whatsapp as "studentWhatsapp",
-          c.password_hash as "portalPassword",
           u.name_ar as "universityNameAr",
           u.name_en as "universityNameEn",
           m.name_ar as "majorNameAr",
@@ -237,22 +276,37 @@ router.get('/:id', async (req: Request, res: Response) => {
       `, [id]);
 
       if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'الطلب غير موجود' });
+      // فحص الملكية: الطالب يرى طلبه فقط
+      if (!canAccessApplication(req, Number(result.rows[0].id))) {
+        return res.status(403).json({ success: false, error: 'غير مصرح بالوصول إلى هذا الطلب' });
+      }
       return res.json({ success: true, data: formatApplicationForResponse(result.rows[0]) });
     }
 
     const app = inMemoryStore.applications.find(a => a.id.toString() === id || a.application_number === id);
     if (!app) return res.status(404).json({ success: false, error: 'الطلب غير موجود' });
+    if (!canAccessApplication(req, app.id)) {
+      return res.status(403).json({ success: false, error: 'غير مصرح بالوصول إلى هذا الطلب' });
+    }
     return res.json({ success: true, data: formatApplicationForResponse(app) });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+  } catch (error) {
+    return failInternal(res, error);
   }
 });
 
 /**
- * تقديم طلب قبول جديد
+ * تقديم طلب قبول جديد — مسار عام (نموذج الموقع)، ومحدود المعدّل ضد الإساءة
  * POST /api/applications
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post(
+  '/',
+  rateLimit({
+    name: 'public-application',
+    windowMs: 60 * 60 * 1000,
+    max: 20,
+    message: 'تم استلام عدد كبير من الطلبات من هذا الجهاز. حاول لاحقاً.',
+  }),
+  async (req: Request, res: Response) => {
   try {
     const {
       studentName,
@@ -273,23 +327,35 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'الاسم والبريد ورقم الهاتف حقول إلزامية' });
     }
 
-    const appNumber = `AFQ-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-    const portalPassword = Math.random().toString(36).slice(-6);
+    const appNumber = `AFQ-2026-${crypto.randomInt(1000, 10000)}`;
+    // كلمة مرور قوية عشوائية للبوابة — تُشفَّر قبل الحفظ ولا تُعاد في أي استجابة
+    const portalPasswordPlain = generateStrongPassword(12);
+    const portalPasswordHash = await hashPassword(portalPasswordPlain);
 
     if (isPostgresConnected) {
-      // 1. تسجيل أو جلب العميل
-      const customerRes = await pool.query(
-        `INSERT INTO customers (name, email, phone, whatsapp, password_hash)
-         VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (email) DO UPDATE SET 
-           name = EXCLUDED.name, 
-           phone = EXCLUDED.phone,
-           whatsapp = COALESCE(EXCLUDED.whatsapp, customers.whatsapp)
-         RETURNING id, password_hash`,
-        [studentName, studentEmail, studentPhone, studentWhatsapp || studentPhone, portalPassword]
+      // 1. جلب العميل إن وُجد وإلا إنشاؤه بكلمة مرور مُشفّرة.
+      //    لا نستبدل بيانات عميل قائم: السلوك السابق (ON CONFLICT DO UPDATE)
+      //    كان يسمح لأي شخص بتقديم طلب ببريد شخص آخر فيكتب اسمه وهاتفه فوق سجله.
+      const existingCustomer = await pool.query(
+        'SELECT id FROM customers WHERE LOWER(email) = LOWER($1) LIMIT 1',
+        [studentEmail]
       );
-      const customerId = customerRes.rows[0].id;
-      const actualPassword = customerRes.rows[0].password_hash;
+
+      let customerId: number;
+      let passwordWasGenerated = false;
+
+      if (existingCustomer.rows.length > 0) {
+        customerId = existingCustomer.rows[0].id;
+      } else {
+        const customerRes = await pool.query(
+          `INSERT INTO customers (name, email, phone, whatsapp, password_hash)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING id`,
+          [studentName, studentEmail, studentPhone, studentWhatsapp || studentPhone, portalPasswordHash]
+        );
+        customerId = customerRes.rows[0].id;
+        passwordWasGenerated = true;
+      }
 
       // 2. إسناد مستشار افتراضي
       const staffRes = await pool.query("SELECT id, name FROM users WHERE role IN ('counselor', 'admin') LIMIT 1");
@@ -325,19 +391,21 @@ router.post('/', async (req: Request, res: Response) => {
         );
       }
 
-      // 5. إشعار الطالب بالبريد الإلكتروني
-      try {
-        await sendStudentCredentialsEmail({
-          studentName,
-          studentEmail,
-          applicationNumber: appNumber,
-          portalPassword: actualPassword,
-          destination: 'المملكة المتحدة',
-          universityName: 'طلب قيد التوزيع الأكاديمي',
-          counselorName: staffName,
-        });
-      } catch (e) {
-        console.warn('Email notification warning:', e);
+      // 5. إشعار الطالب بالبريد الإلكتروني (بكلمة المرور الجديدة فقط)
+      if (passwordWasGenerated) {
+        try {
+          await sendStudentCredentialsEmail({
+            studentName,
+            studentEmail,
+            applicationNumber: appNumber,
+            portalPassword: portalPasswordPlain,
+            destination: 'المملكة المتحدة',
+            universityName: 'طلب قيد التوزيع الأكاديمي',
+            counselorName: staffName,
+          });
+        } catch (e) {
+          console.warn('Email notification warning:', e);
+        }
       }
 
       // 6. إشعار تيليجرام
@@ -373,7 +441,8 @@ router.post('/', async (req: Request, res: Response) => {
       studentEmail,
       studentPhone,
       studentWhatsapp: studentWhatsapp || studentPhone,
-      portalPassword,
+      // كلمة المرور تُخزَّن مُشفّرة فقط، ولا تُعاد في الاستجابة
+      portal_password: portalPasswordHash,
       university_id: universityId || 1,
       university_name_ar: 'جامعة مانشستر',
       major_id: majorId || 1,
@@ -400,15 +469,16 @@ router.post('/', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error submitting application:', error.message);
-    return res.status(500).json({ success: false, error: error.message });
+    return failInternal(res, error);
   }
-});
+  }
+);
 
 /**
  * تحديث حالة طلب معين وتسجيل التغيير
- * PATCH /api/applications/:id/status
+ * PATCH /api/applications/:id/status — للموظفين فقط
  */
-router.patch('/:id/status', async (req: Request, res: Response) => {
+router.patch('/:id/status', requireStaff(), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status, note, staffId } = req.body;
@@ -453,15 +523,15 @@ router.patch('/:id/status', async (req: Request, res: Response) => {
 
     return res.status(404).json({ success: false, error: 'الطلب غير موجود' });
   } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+    return failInternal(res, error);
   }
 });
 
 /**
  * تحديث حالة مستند معين (اعتماد / رفض / طلب إعادة رفع)
- * PATCH /api/applications/:id/documents/:docId
+ * PATCH /api/applications/:id/documents/:docId — للموظفين فقط
  */
-router.patch('/:id/documents/:docId', async (req: Request, res: Response) => {
+router.patch('/:id/documents/:docId', requireStaff(), async (req: Request, res: Response) => {
   try {
     const { id, docId } = req.params;
     const { status, feedback } = req.body;
@@ -495,15 +565,15 @@ router.patch('/:id/documents/:docId', async (req: Request, res: Response) => {
     saveStoreToDisk();
     return res.json({ success: true, message: 'تم تحديث حالة المستند بنجاح' });
   } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+    return failInternal(res, error);
   }
 });
 
 /**
  * تحديث شامل لبيانات الطلب والمستندات
- * PUT /api/applications/:id
+ * PUT /api/applications/:id — للموظفين فقط
  */
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', requireStaff(), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
@@ -517,7 +587,16 @@ router.put('/:id', async (req: Request, res: Response) => {
         await pool.query('UPDATE applications SET status = $1, updated_at = NOW() WHERE id = $2', [updateData.status, numericId]);
       }
       if (updateData.portalPassword) {
-        await pool.query('UPDATE customers SET password_hash = $1 WHERE id = (SELECT customer_id FROM applications WHERE id = $2)', [updateData.portalPassword, numericId]);
+        // تُشفَّر كلمة المرور قبل الحفظ، وتُبطَل جلسات الطالب الحالية
+        if (String(updateData.portalPassword).length < 8) {
+          return res.status(400).json({ success: false, error: 'كلمة مرور البوابة يجب أن تكون 8 أحرف على الأقل' });
+        }
+        const newPortalHash = await hashPassword(String(updateData.portalPassword));
+        await pool.query(
+          'UPDATE customers SET password_hash = $1 WHERE id = (SELECT customer_id FROM applications WHERE id = $2)',
+          [newPortalHash, numericId]
+        );
+        destroySessionsForApplication(numericId);
       }
       if (updateData.counselorId !== undefined || updateData.staffId !== undefined || updateData.staff_id !== undefined) {
         const rawStaffId = updateData.counselorId || updateData.staffId || updateData.staff_id;
@@ -545,8 +624,12 @@ router.put('/:id', async (req: Request, res: Response) => {
 
     if (updateData.status) app.status = updateData.status;
     if (updateData.portalPassword) {
-      app.portal_password = updateData.portalPassword;
-      (app as any).portalPassword = updateData.portalPassword;
+      if (String(updateData.portalPassword).length < 8) {
+        return res.status(400).json({ success: false, error: 'كلمة مرور البوابة يجب أن تكون 8 أحرف على الأقل' });
+      }
+      app.portal_password = await hashPassword(String(updateData.portalPassword));
+      delete (app as any).portalPassword;
+      destroySessionsForApplication(app.id);
     }
     if (updateData.notes) app.notes = updateData.notes;
     if (updateData.counselorId !== undefined) {
@@ -565,15 +648,17 @@ router.put('/:id', async (req: Request, res: Response) => {
 
     return res.json({ success: true, message: 'تم تحديث بيانات الطلب بنجاح', data: formatApplicationForResponse(app) });
   } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+    return failInternal(res, error);
   }
 });
 
 /**
  * رفع مستند جديد أو تحديث ملف مستند موجود من قبل الطالب
  * POST /api/applications/:id/documents
+ * يحتاج جلسة: الموظف يرفع لأي طلب، والطالب لطلبه فقط.
+ * نوع الملف وحجمه يُفحصان من محتوى الملف نفسه.
  */
-router.post('/:id/documents', async (req: Request, res: Response) => {
+router.post('/:id/documents', requireAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     let { docId, docType, nameAr, nameEn, fileName, fileSize, fileUrl } = req.body;
@@ -582,23 +667,38 @@ router.post('/:id/documents', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'اسم الملف أو بيانات الملف مطلوبة للرفع' });
     }
 
+    // فحص الملكية قبل أي عملية
+    const ownerAppId = await resolveApplicationId(id);
+    if (ownerAppId === null) {
+      return res.status(404).json({ success: false, error: 'الطلب غير موجود' });
+    }
+    if (!canAccessApplication(req, ownerAppId)) {
+      return res.status(403).json({ success: false, error: 'غير مصرح بالوصول إلى هذا الطلب' });
+    }
+
     const effectiveFileName = fileName || 'document.pdf';
-    let savedFileUrl = fileUrl || '';
+    let savedFileUrl = '';
     let calculatedSize = fileSize || '1.2 MB';
 
-    // إذا كانت بيانات الملف بصيغة base64، احفظ الملف في مجلد /uploads/documents/ على خادم السيرفر
+    // بيانات الملف بصيغة base64 → تُحفظ في مجلد خاص خارج public/
+    // النوع والحجم يُفحصان داخل saveUploadedDocument (توقيع ثنائي + قائمة بيضاء)
     if (fileUrl && (fileUrl.startsWith('data:') || fileUrl.length > 500)) {
       try {
         const saved = saveUploadedDocument(id, docType || 'other', effectiveFileName, fileUrl);
         savedFileUrl = saved.fileUrl;
         calculatedSize = saved.fileSize || fileSize || '1.2 MB';
       } catch (err: any) {
-        console.error('⚠️ [FileStorage] Error saving uploaded file to disk:', err.message);
+        // نُظهر سبب الرفض (نوع غير مدعوم / حجم كبير) بدل تجاهله
+        return res.status(400).json({ success: false, error: err?.message || 'تعذّر حفظ الملف المرفوع' });
       }
-    }
-
-    if (!savedFileUrl) {
-      savedFileUrl = `/uploads/documents/${id}_${docType || 'doc'}_${Date.now()}.pdf`;
+    } else {
+      // ⛔ لا يُقبل مسار ملفّي من العميل إطلاقاً.
+      // (كان الكود السابق يخزّن أي نص يرسله العميل كـ file_url، وهو ما سمح
+      //  بقراءة أي ملف على السيرفر عبر مسار التنزيل.)
+      return res.status(400).json({
+        success: false,
+        error: 'يجب رفع محتوى الملف نفسه (base64) ولا يُقبل رابط أو مسار',
+      });
     }
 
     if (isPostgresConnected) {
@@ -726,270 +826,462 @@ router.post('/:id/documents', async (req: Request, res: Response) => {
     return res.json({ success: true, message: 'تم حفظ ورفع المستند بنجاح على السيرفر', data: docObj });
   } catch (error: any) {
     console.error('Error in POST /documents:', error);
-    return res.status(500).json({ success: false, error: error.message });
+    return failInternal(res, error);
   }
 });
 
 /**
  * حذف أو إعادة تعيين مستند من الطلب
- * DELETE /api/applications/:id/documents/:docId
+ * DELETE /api/applications/:id/documents/:docId — يحتاج جلسة (الموظف أو صاحب الطلب)
+ * يُحذف الملف من القرص فعلياً، لا يُفرَّغ المسار فقط.
  */
-router.delete('/:id/documents/:docId', async (req: Request, res: Response) => {
+router.delete('/:id/documents/:docId', requireAuth, async (req: Request, res: Response) => {
   try {
     const { id, docId } = req.params;
 
-    if (isPostgresConnected) {
-      await pool.query(
-        'UPDATE documents SET file_url = NULL, status = $1 WHERE id::text = $2 AND application_id IN (SELECT id FROM applications WHERE id::text = $3 OR application_number = $3)',
-        ['pending', docId, id]
-      );
-      return res.json({ success: true, message: 'تم إلغاء رفع المستند بنجاح من قاعدة البيانات' });
+    const ownerAppId = await resolveApplicationId(id);
+    if (ownerAppId === null) {
+      return res.status(404).json({ success: false, error: 'الطلب غير موجود' });
+    }
+    if (!canAccessApplication(req, ownerAppId)) {
+      return res.status(403).json({ success: false, error: 'غير مصرح بالوصول إلى هذا الطلب' });
     }
 
-    const app = inMemoryStore.applications.find(a => a.id.toString() === id || a.application_number === id);
+    if (isPostgresConnected) {
+      // نجلب مسار الملف قبل تفريغه حتى نحذف الملف نفسه من القرص
+      const docRes = await pool.query(
+        'SELECT id, file_url FROM documents WHERE id::text = $1 AND application_id = $2 LIMIT 1',
+        [docId, ownerAppId]
+      );
+      if (docRes.rows.length > 0 && docRes.rows[0].file_url) {
+        deleteStoredFile(docRes.rows[0].file_url);
+      }
+      await pool.query(
+        'UPDATE documents SET file_url = NULL, status = $1, file_name = NULL, file_size = NULL WHERE id::text = $2 AND application_id = $3',
+        ['pending', docId, ownerAppId]
+      );
+      return res.json({ success: true, message: 'تم حذف المستند بنجاح' });
+    }
+
+    const app = inMemoryStore.applications.find(a => a.id === ownerAppId);
     if (app && app.documents) {
       const targetDoc = app.documents.find((d: any) => d.id?.toString() === docId.toString());
       if (targetDoc) {
+        const storedRef = (targetDoc as any).file_url || (targetDoc as any).fileUrl;
+        deleteStoredFile(storedRef);
         (targetDoc as any).status = 'pending';
         delete (targetDoc as any).fileName;
         delete (targetDoc as any).file_name;
         delete (targetDoc as any).fileSize;
         delete (targetDoc as any).file_size;
         delete (targetDoc as any).file_url;
+        delete (targetDoc as any).fileUrl;
+        saveStoreToDisk();
       }
     }
 
-    return res.json({ success: true, message: 'تم إلغاء رفع المستند بنجاح' });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+    return res.json({ success: true, message: 'تم حذف المستند بنجاح' });
+  } catch (error) {
+    return failInternal(res, error);
   }
 });
 
 /**
- * عرض وتنزيل ملف المستند المرفوع مباشرة وبثه للمتصفح
+ * عرض وتنزيل ملف المستند المرفوع
  * GET /api/applications/:id/documents/:docId/file
+ * يحتاج جلسة: الموظف يصل لأي مستند، والطالب لمستندات طلبه فقط.
+ * المسار يُشتقّ من معرّف الملف المخزّن في قاعدة البيانات فقط — لا من أي مدخل عميل.
  */
-router.get('/:id/documents/:docId/file', async (req: Request, res: Response) => {
+router.get('/:id/documents/:docId/file', requireAuth, async (req: Request, res: Response) => {
   try {
     const { id, docId } = req.params;
-    let fileUrl = '';
+
+    // 1. فحص الملكية
+    const ownerAppId = await resolveApplicationId(id);
+    if (ownerAppId === null) {
+      return res.status(404).json({ success: false, error: 'الطلب غير موجود' });
+    }
+    if (!canAccessApplication(req, ownerAppId)) {
+      return res.status(403).json({ success: false, error: 'غير مصرح بالوصول إلى هذا المستند' });
+    }
+
+    // 2. جلب مرجع الملف من قاعدة البيانات لهذا الطلب تحديداً
+    let storedRef = '';
     let fileName = 'document.pdf';
 
     if (isPostgresConnected) {
       const docRes = await pool.query(
-        'SELECT file_url, file_name, name_ar FROM documents WHERE (id::text = $1 OR doc_type = $1) AND application_id IN (SELECT id FROM applications WHERE id::text = $2 OR application_number = $2) LIMIT 1',
-        [docId, id]
+        'SELECT file_url, file_name, name_ar FROM documents WHERE id::text = $1 AND application_id = $2 LIMIT 1',
+        [docId, ownerAppId]
       );
       if (docRes.rows.length > 0) {
-        fileUrl = docRes.rows[0].file_url || '';
+        storedRef = docRes.rows[0].file_url || '';
         fileName = docRes.rows[0].file_name || docRes.rows[0].name_ar || 'document.pdf';
       }
-    }
-
-    if (!fileUrl) {
-      const app = inMemoryStore.applications.find(a => a.id.toString() === id || a.application_number === id);
-      if (app && app.documents) {
-        const doc: any = app.documents.find((d: any) => d.id?.toString() === docId.toString() || d.doc_type === docId || d.category === docId);
-        if (doc) {
-          fileUrl = doc.file_url || doc.fileUrl || '';
-          fileName = doc.file_name || doc.fileName || doc.name_ar || doc.nameAr || 'document.pdf';
-        }
+    } else {
+      const app = inMemoryStore.applications.find((a) => a.id === ownerAppId);
+      const doc: any = app?.documents?.find(
+        (d: any) => d.id?.toString() === docId.toString() || d.doc_type === docId || d.category === docId
+      );
+      if (doc) {
+        storedRef = doc.file_url || doc.fileUrl || '';
+        fileName = doc.file_name || doc.fileName || doc.name_ar || doc.nameAr || 'document.pdf';
       }
     }
 
-    // 1. إذا كان الملف مخزناً بصيغة Base64
-    if (fileUrl && fileUrl.startsWith('data:')) {
-      const matches = fileUrl.match(/^data:([^;]+);base64,(.*)$/);
-      if (matches) {
-        const mimeType = matches[1];
-        const buffer = Buffer.from(matches[2], 'base64');
-        res.setHeader('Content-Type', mimeType);
-        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileName)}"`);
-        return res.send(buffer);
-      }
+    if (!storedRef) {
+      return res.status(404).json({ success: false, error: 'لا يوجد ملف مرفوع لهذا المستند' });
     }
 
-    // 2. إذا كان الملف مخزناً بمسار نسبي على الخادم
-    if (fileUrl) {
-      const cleanUrl = fileUrl.startsWith('/') ? fileUrl.substring(1) : fileUrl;
-      const pathsToTry = [
-        path.join(process.cwd(), 'public', cleanUrl),
-        path.join(process.cwd(), cleanUrl),
-        path.join(process.cwd(), 'public', 'uploads', 'documents', path.basename(cleanUrl)),
-        path.join(process.cwd(), 'uploads', 'documents', path.basename(cleanUrl)),
-      ];
-
-      for (const p of pathsToTry) {
-        if (fs.existsSync(p) && fs.statSync(p).isFile()) {
-          return res.sendFile(p);
-        }
+    // 3. دعم القيم القديمة المخزّنة كـ data: URL مباشرة
+    if (storedRef.startsWith('data:')) {
+      const matches = storedRef.match(/^data:(application\/pdf|image\/jpeg|image\/png|image\/webp);base64,(.*)$/);
+      if (!matches) {
+        return res.status(415).json({ success: false, error: 'نوع الملف المخزّن غير مسموح' });
       }
+      const buffer = Buffer.from(matches[2], 'base64');
+      res.setHeader('Content-Type', matches[1]);
+      // attachment وليس inline — يمنع تنفيذ أي محتوى في سياق الموقع
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      return res.send(buffer);
     }
 
-    // 3. البحث الشامل في مجلد المرفقات عن أي ملف متوافق
-    const uploadsDirs = [
-      path.join(process.cwd(), 'public', 'uploads', 'documents'),
-      path.join(process.cwd(), 'uploads', 'documents'),
-    ];
-
-    for (const uDir of uploadsDirs) {
-      if (fs.existsSync(uDir)) {
-        const files = fs.readdirSync(uDir);
-        const match = files.find(f => f.includes(id) || f.includes(docId) || (fileName && f.includes(fileName)));
-        if (match) {
-          return res.sendFile(path.join(uDir, match));
-        }
-      }
+    // 4. حلّ المرجع إلى مسار داخل مجلد التخزين الخاص فقط.
+    //    resolveStoredFile يرفض أي قيمة تحتوي .. أو محارف مسار أو امتداداً غير مسموح.
+    const resolved = resolveStoredFile(storedRef);
+    if (!resolved) {
+      return res.status(404).json({ success: false, error: 'تعذر العثور على الملف' });
     }
 
-    return res.status(404).json({ success: false, error: 'تعذر العثور على الملف في الخادم' });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+    res.setHeader('Content-Type', resolved.mime);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.sendFile(resolved.absolutePath);
+  } catch (error) {
+    return failInternal(res, error);
   }
 });
 
 /**
  * تسجيل دخول بوابة الطالب المخصصة
  * POST /api/applications/portal-login
+ * محدود المعدّل — ولا توجد أي كلمة مرور افتراضية مقبولة.
  */
-router.post('/portal-login', async (req: Request, res: Response) => {
+router.post(
+  '/portal-login',
+  rateLimit({
+    name: 'portal-login',
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: 'عدد محاولات الدخول كبير جداً. حاول مرة أخرى بعد 15 دقيقة.',
+  }),
+  async (req: Request, res: Response) => {
   try {
     const { loginId, password } = req.body;
     if (!loginId || !password) {
       return res.status(400).json({ success: false, error: 'رقم الطلب أو البريد الإلكتروني وكلمة المرور مطلوبة' });
     }
 
-    const trimmedLogin = loginId.trim();
-    const trimmedPass = password.trim();
+    const trimmedLogin = String(loginId).trim();
+    const trimmedPass = String(password);
+
+    // رد موحّد لكل حالات الفشل — يمنع كشف أي حساب موجود
+    const invalid = () => res.status(401).json({ success: false, error: 'بيانات الدخول غير صحيحة' });
+
+    const fullAppQuery = `
+      SELECT
+        a.*,
+        a.application_number as "applicationNumber",
+        a.id as "resolvedId",
+        c.name as "studentName",
+        c.email as "studentEmail",
+        c.phone as "studentPhone",
+        c.whatsapp as "studentWhatsapp",
+        c.password_hash as "__passwordHash",
+        u.name_ar as "universityNameAr",
+        u.name_en as "universityNameEn",
+        m.name_ar as "majorNameAr",
+        m.name_en as "majorNameEn",
+        co.name_ar as "countryNameAr",
+        a.staff_id as "counselorId",
+        us.name as "counselorName",
+        us.phone as "counselorPhone",
+        COALESCE((SELECT json_agg(d.*) FROM documents d WHERE d.application_id = a.id), '[]') as documents,
+        COALESCE((SELECT json_agg(msg.*) FROM messages msg WHERE msg.application_id = a.id), '[]') as messages
+      FROM applications a
+      JOIN customers c ON a.customer_id = c.id
+      LEFT JOIN universities u ON a.university_id = u.id
+      LEFT JOIN majors m ON a.major_id = m.id
+      LEFT JOIN countries co ON a.country_id = co.id
+      LEFT JOIN users us ON a.staff_id = us.id
+      WHERE (a.application_number = $1 OR c.email = $1)
+      LIMIT 1
+    `;
 
     if (isPostgresConnected) {
-      const result = await pool.query(`
-        SELECT 
-          a.*,
-          a.application_number as "applicationNumber",
-          c.name as "studentName",
-          c.email as "studentEmail",
-          c.phone as "studentPhone",
-          c.whatsapp as "studentWhatsapp",
-          c.password_hash as "portalPassword",
-          u.name_ar as "universityNameAr",
-          u.name_en as "universityNameEn",
-          m.name_ar as "majorNameAr",
-          m.name_en as "majorNameEn",
-          co.name_ar as "countryNameAr",
-          a.staff_id as "counselorId",
-          us.name as "counselorName",
-          us.phone as "counselorPhone",
-          COALESCE((SELECT json_agg(d.*) FROM documents d WHERE d.application_id = a.id), '[]') as documents,
-          COALESCE((SELECT json_agg(msg.*) FROM messages msg WHERE msg.application_id = a.id), '[]') as messages
-        FROM applications a
-        JOIN customers c ON a.customer_id = c.id
-        LEFT JOIN universities u ON a.university_id = u.id
-        LEFT JOIN majors m ON a.major_id = m.id
-        LEFT JOIN countries co ON a.country_id = co.id
-        LEFT JOIN users us ON a.staff_id = us.id
-        WHERE (a.application_number = $1 OR c.email = $1)
-          AND (c.password_hash = $2 OR $2 = '123456')
-        LIMIT 1
-      `, [trimmedLogin, trimmedPass]);
+      const result = await pool.query(fullAppQuery, [trimmedLogin]);
+      if (result.rows.length === 0) return invalid();
 
-      if (result.rows.length === 0) {
-        return res.status(401).json({ success: false, error: 'بيانات الدخول غير صحيحة' });
+      const row = result.rows[0];
+      const storedHash = row.__passwordHash;
+      if (!storedHash) return invalid();
+
+      const verdict = await verifyPassword(trimmedPass, storedHash);
+      if (!verdict.ok) return invalid();
+
+      // ترحيل شفّاف للقيم القديمة المخزّنة كنص صريح
+      if (verdict.needsRehash) {
+        try {
+          const upgraded = await hashPassword(trimmedPass);
+          await pool.query('UPDATE customers SET password_hash = $1 WHERE id = $2', [upgraded, row.customer_id]);
+          console.log(`🔐 [Portal] تم ترحيل كلمة مرور الطالب للطلب #${row.id}`);
+        } catch (migErr) {
+          console.error('⚠️ [Portal] فشل ترحيل كلمة المرور:', migErr);
+        }
       }
 
-      return res.json({ success: true, message: 'تم تسجيل الدخول بنجاح', data: formatApplicationForResponse(result.rows[0]) });
+      const resolvedId = Number(row.resolvedId);
+      const { token } = createSession(
+        {
+          kind: 'student',
+          applicationId: resolvedId,
+          name: row.studentName,
+          email: row.studentEmail,
+        },
+        STUDENT_SESSION_TTL_MS
+      );
+      res.cookie(SESSION_COOKIE_NAME, token, sessionCookieOptions(STUDENT_SESSION_TTL_MS));
+
+      // لا نُمرّر حقل كلمة المرور إلى دالة التنسيق إطلاقاً
+      delete row.__passwordHash;
+
+      return res.json({
+        success: true,
+        message: 'تم تسجيل الدخول بنجاح',
+        data: formatApplicationForResponse(row),
+        token,
+        expiresInMs: STUDENT_SESSION_TTL_MS,
+      });
     }
 
+    // النسخة الاحتياطية في الذاكرة
     const app = inMemoryStore.applications.find(
-      a => (a.application_number === trimmedLogin || a.customer_email === trimmedLogin || a.id.toString() === trimmedLogin)
+      (a) =>
+        a.application_number === trimmedLogin ||
+        a.customer_email === trimmedLogin ||
+        a.id.toString() === trimmedLogin
     );
-    if (!app) return res.status(401).json({ success: false, error: 'رقم الطلب أو البريد الإلكتروني غير مسجل' });
+    if (!app) return invalid();
 
-    const validPass = (app.portal_password || (app as any).portalPassword || '123456');
-    if (trimmedPass !== validPass && trimmedPass !== '123456') {
-      return res.status(401).json({ success: false, error: 'كلمة المرور غير صحيحة' });
+    const storedHash = (app as any).portal_password || (app as any).portalPassword || '';
+    const verdict = await verifyPassword(trimmedPass, storedHash);
+    if (!verdict.ok) return invalid();
+
+    if (verdict.needsRehash) {
+      (app as any).portal_password = await hashPassword(trimmedPass);
+      delete (app as any).portalPassword;
+      saveStoreToDisk();
     }
 
-    return res.json({ success: true, message: 'تم تسجيل الدخول بنجاح', data: formatApplicationForResponse(app) });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+    const { token } = createSession(
+      {
+        kind: 'student',
+        applicationId: app.id,
+        name: app.customer_name,
+        email: app.customer_email,
+      },
+      STUDENT_SESSION_TTL_MS
+    );
+    res.cookie(SESSION_COOKIE_NAME, token, sessionCookieOptions(STUDENT_SESSION_TTL_MS));
+
+    return res.json({
+      success: true,
+      message: 'تم تسجيل الدخول بنجاح',
+      data: formatApplicationForResponse(app),
+      token,
+      expiresInMs: STUDENT_SESSION_TTL_MS,
+    });
+  } catch (error) {
+    return failInternal(res, error);
+  }
+  }
+);
+
+/**
+ * تسجيل خروج الطالب
+ * POST /api/applications/portal-logout
+ */
+router.post('/portal-logout', requireAuth, (req: Request, res: Response) => {
+  destroySession(req.authToken);
+  res.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
+  return res.json({ success: true, message: 'تم تسجيل الخروج بنجاح' });
+});
+
+/**
+ * التحقق من جلسة الطالب الحالية (بديل الوثوق بما في localStorage)
+ * GET /api/applications/portal-session
+ */
+router.get('/portal-session', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const session = req.auth!;
+    if (session.kind === 'staff') {
+      return res.json({ success: true, kind: 'staff', user: { id: session.userId, name: session.name, role: session.role } });
+    }
+    const appId = session.applicationId;
+    if (!appId) return res.status(401).json({ success: false, error: 'جلسة غير صالحة' });
+
+    if (isPostgresConnected) {
+      const result = await pool.query(
+        `SELECT a.*, a.application_number as "applicationNumber", a.id as "resolvedId",
+                c.name as "studentName", c.email as "studentEmail", c.phone as "studentPhone",
+                c.whatsapp as "studentWhatsapp",
+                u.name_ar as "universityNameAr", u.name_en as "universityNameEn",
+                m.name_ar as "majorNameAr", m.name_en as "majorNameEn",
+                co.name_ar as "countryNameAr",
+                a.staff_id as "counselorId", us.name as "counselorName", us.phone as "counselorPhone",
+                COALESCE((SELECT json_agg(d.*) FROM documents d WHERE d.application_id = a.id), '[]') as documents,
+                COALESCE((SELECT json_agg(msg.*) FROM messages msg WHERE msg.application_id = a.id), '[]') as messages
+         FROM applications a
+         JOIN customers c ON a.customer_id = c.id
+         LEFT JOIN universities u ON a.university_id = u.id
+         LEFT JOIN majors m ON a.major_id = m.id
+         LEFT JOIN countries co ON a.country_id = co.id
+         LEFT JOIN users us ON a.staff_id = us.id
+         WHERE a.id = $1 LIMIT 1`,
+        [appId]
+      );
+      if (result.rows.length === 0) return res.status(401).json({ success: false, error: 'جلسة غير صالحة' });
+      return res.json({ success: true, kind: 'student', data: formatApplicationForResponse(result.rows[0]) });
+    }
+
+    const app = inMemoryStore.applications.find((a) => a.id === appId);
+    if (!app) return res.status(401).json({ success: false, error: 'جلسة غير صالحة' });
+    return res.json({ success: true, kind: 'student', data: formatApplicationForResponse(app) });
+  } catch (error) {
+    return failInternal(res, error);
   }
 });
 
 /**
- * تحديث كلمة المرور الخاصة بالطالب
+ * تحديث كلمة المرور الخاصة بالطالب — للموظفين فقط
  * PATCH /api/applications/:id/portal-password
  */
-router.patch('/:id/portal-password', async (req: Request, res: Response) => {
+router.patch('/:id/portal-password', requireStaff(), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { newPassword } = req.body;
 
     if (!newPassword) return res.status(400).json({ success: false, error: 'كلمة المرور الجديدة مطلوبة' });
+    if (String(newPassword).length < 8) {
+      return res.status(400).json({ success: false, error: 'كلمة المرور يجب أن تكون 8 أحرف على الأقل' });
+    }
+
+    const appId = await resolveApplicationId(id);
+    if (appId === null) return res.status(404).json({ success: false, error: 'الطلب غير موجود' });
+
+    const newHash = await hashPassword(String(newPassword));
 
     if (isPostgresConnected) {
-      await pool.query(`
-        UPDATE customers SET password_hash = $1
-        WHERE id = (SELECT customer_id FROM applications WHERE id::text = $2 OR application_number = $2)
-      `, [newPassword, id]);
-
+      await pool.query(
+        `UPDATE customers SET password_hash = $1
+         WHERE id = (SELECT customer_id FROM applications WHERE id = $2)`,
+        [newHash, appId]
+      );
+      // إبطال أي جلسة قائمة لهذا الطلب حتى تُستخدم الكلمة الجديدة
+      destroySessionsForApplication(appId);
       return res.json({ success: true, message: 'تم تحديث كلمة المرور بنجاح' });
     }
 
+    const app = inMemoryStore.applications.find((a) => a.id === appId);
+    if (app) {
+      (app as any).portal_password = newHash;
+      delete (app as any).portalPassword;
+      saveStoreToDisk();
+    }
+    destroySessionsForApplication(appId);
     return res.json({ success: true, message: 'تم تحديث كلمة المرور بنجاح' });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+  } catch (error) {
+    return failInternal(res, error);
   }
 });
 
 /**
- * إرسال بيانات الدخول إلى بريد الطالب
+ * إصدار كلمة مرور جديدة للطالب وإرسالها إلى بريده — للموظفين فقط
  * POST /api/applications/:id/send-credentials
+ *
+ * ملاحظة مهمّة: لم يعد ممكناً استرجاع كلمة المرور القديمة (لأنها مُشفّرة)،
+ * لذلك يُولَّد هنا بديل جديد ويُحفظ مُشفّراً ويُرسل للطالب.
  */
-router.post('/:id/send-credentials', async (req: Request, res: Response) => {
+router.post('/:id/send-credentials', requireStaff(), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    if (isPostgresConnected) {
-      const appRes = await pool.query(`
-        SELECT 
-          c.name, c.email, c.password_hash, a.application_number,
-          u.name_ar as uni_name, co.name_ar as country_name, us.name as staff_name
-        FROM applications a
-        JOIN customers c ON a.customer_id = c.id
-        LEFT JOIN universities u ON a.university_id = u.id
-        LEFT JOIN countries co ON a.country_id = co.id
-        LEFT JOIN users us ON a.staff_id = us.id
-        WHERE a.id::text = $1 OR a.application_number = $1
-      `, [id]);
+    const appId = await resolveApplicationId(id);
+    if (appId === null) return res.status(404).json({ success: false, error: 'الطلب غير موجود' });
 
+    const plainPassword = generateStrongPassword(12);
+    const passwordHash = await hashPassword(plainPassword);
+
+    if (isPostgresConnected) {
+      const appRes = await pool.query(
+        `SELECT c.id as customer_id, c.name, c.email, a.application_number,
+                u.name_ar as uni_name, co.name_ar as country_name, us.name as staff_name
+         FROM applications a
+         JOIN customers c ON a.customer_id = c.id
+         LEFT JOIN universities u ON a.university_id = u.id
+         LEFT JOIN countries co ON a.country_id = co.id
+         LEFT JOIN users us ON a.staff_id = us.id
+         WHERE a.id = $1`,
+        [appId]
+      );
       if (appRes.rows.length === 0) return res.status(404).json({ success: false, error: 'الطلب غير موجود' });
 
       const row = appRes.rows[0];
+      await pool.query('UPDATE customers SET password_hash = $1 WHERE id = $2', [passwordHash, row.customer_id]);
+      destroySessionsForApplication(appId);
+
       await sendStudentCredentialsEmail({
         studentName: row.name,
         studentEmail: row.email,
         applicationNumber: row.application_number,
-        portalPassword: row.password_hash,
+        portalPassword: plainPassword,
         destination: row.country_name || 'المملكة المتحدة',
         universityName: row.uni_name || 'جامعة مانشستر',
         counselorName: row.staff_name || 'المستشار الأكاديمي',
       });
 
-      return res.json({ success: true, message: `تم إرسال بيانات الدخول بنجاح إلى البريد: ${row.email}` });
+      return res.json({
+        success: true,
+        message: `تم إصدار كلمة مرور جديدة وإرسالها إلى البريد: ${row.email}`,
+        // تُعاد مرة واحدة ليتمكن الموظف من تسليمها عبر الواتساب إن لزم
+        generatedPassword: plainPassword,
+      });
     }
 
-    return res.json({ success: true, message: 'تم إرسال بيانات الدخول بنجاح إلى بريد الطالب' });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+    const app = inMemoryStore.applications.find((a) => a.id === appId);
+    if (app) {
+      (app as any).portal_password = passwordHash;
+      delete (app as any).portalPassword;
+      saveStoreToDisk();
+    }
+    destroySessionsForApplication(appId);
+
+    return res.json({
+      success: true,
+      message: 'تم إصدار كلمة مرور جديدة للطالب',
+      generatedPassword: plainPassword,
+    });
+  } catch (error) {
+    return failInternal(res, error);
   }
 });
 
 /**
- * إرسال خطاب/رد رسمي وتنبيهات مخصصة للطالب
+ * إرسال خطاب/رد رسمي وتنبيهات مخصصة للطالب — للموظفين فقط
  * POST /api/applications/:id/send-response
  */
-router.post('/:id/send-response', async (req: Request, res: Response) => {
+router.post('/:id/send-response', requireStaff(), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { channel, messageText } = req.body;

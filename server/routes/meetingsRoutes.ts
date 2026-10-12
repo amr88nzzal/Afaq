@@ -2,22 +2,32 @@
  * ============================================================================
  * مسارات المواعيد والاستشارات الأكاديمية (Consultation Meetings API)
  * ============================================================================
+ * ملاحظات أمنية على هذه النسخة:
+ *   - GET كان مفتوحاً ويعيد كل المواعيد مع أرقام هواتف الطلاب والمستشارين.
+ *     الآن محصور بالموظفين.
+ *   - POST (نموذج حجز عام) كان يُنشئ حساب عميل بكلمة مرور نصاً صريحاً '123456'
+ *     ويستبدل هاتف عميل قائم عند تطابق البريد. أُصلح الاثنان.
+ *   - PUT كان يستقبل req.body كاملاً (Mass Assignment). الآن حقول محدّدة.
  */
 
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import { pool, isPostgresConnected, inMemoryStore } from '../db';
+import { hashPassword, generateStrongPassword } from '../services/passwordService';
+import { requireStaff } from '../middleware/auth';
+import { rateLimit, failInternal } from '../middleware/security';
 
 const router = Router();
 
 /**
- * جلب جميع مواعيد الاستشارات
+ * جلب جميع مواعيد الاستشارات — للموظفين فقط
  * GET /api/meetings
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', requireStaff(), async (_req: Request, res: Response) => {
   try {
     if (isPostgresConnected) {
       const result = await pool.query(`
-        SELECT m.*, 
+        SELECT m.*,
                u.name as counselor_name, u.phone as counselor_phone
         FROM meetings m
         LEFT JOIN users u ON m.staff_id = u.id
@@ -26,16 +36,24 @@ router.get('/', async (req: Request, res: Response) => {
       return res.json({ success: true, source: 'postgres', data: result.rows });
     }
     return res.json({ success: true, source: 'in-memory', data: inMemoryStore.meetings });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+  } catch (error) {
+    return failInternal(res, error);
   }
 });
 
 /**
- * حجز موعد استشارة أكاديمية جديد
+ * حجز موعد استشارة أكاديمية جديد — مسار عام (نموذج الموقع) ومحدود المعدّل
  * POST /api/meetings
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post(
+  '/',
+  rateLimit({
+    name: 'public-meeting',
+    windowMs: 60 * 60 * 1000,
+    max: 10,
+    message: 'تم استلام عدد كبير من طلبات الحجز من هذا الجهاز. حاول لاحقاً.',
+  }),
+  async (req: Request, res: Response) => {
   try {
     const {
       customer_name,
@@ -52,22 +70,34 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'الرجاء استكمال جميع بيانات الموعد' });
     }
 
+    const meetingLink = `https://meet.google.com/afq-${crypto.randomBytes(4).toString('hex')}`;
+
     if (isPostgresConnected) {
-      // 1. تسجيل أو إيجاد العميل
-      const custRes = await pool.query(
-        `INSERT INTO customers (name, email, phone, password_hash)
-         VALUES ($1, $2, $3, '123456')
-         ON CONFLICT (email) DO UPDATE SET phone = EXCLUDED.phone
-         RETURNING id`,
-        [customer_name, customer_email, customer_phone]
+      // 1. إيجاد العميل إن وُجد، وإلا إنشاؤه بكلمة مرور مُشفّرة عشوائية.
+      //    (كان السابق يُنشئ الحساب بكلمة '123456' نصاً صريحاً، ويستبدل
+      //     هاتف عميل قائم عند تطابق البريد.)
+      const existing = await pool.query(
+        'SELECT id FROM customers WHERE LOWER(email) = LOWER($1) LIMIT 1',
+        [customer_email]
       );
-      const customerId = custRes.rows[0].id;
+
+      let customerId: number;
+      if (existing.rows.length > 0) {
+        customerId = existing.rows[0].id;
+      } else {
+        const newHash = await hashPassword(generateStrongPassword(12));
+        const created = await pool.query(
+          `INSERT INTO customers (name, email, phone, whatsapp, password_hash, current_status)
+           VALUES ($1, $2, $3, $3, $4, 'active')
+           RETURNING id`,
+          [customer_name, customer_email, customer_phone, newHash]
+        );
+        customerId = created.rows[0].id;
+      }
 
       // 2. إسناد مستشار متاح تلقائياً
-      const staffRes = await pool.query("SELECT id FROM users WHERE role = 'counselor' OR role = 'admin' LIMIT 1");
+      const staffRes = await pool.query("SELECT id FROM users WHERE role IN ('counselor', 'admin') LIMIT 1");
       const staffId = staffRes.rows.length > 0 ? staffRes.rows[0].id : null;
-
-      const meetingLink = `https://meet.google.com/afq-${Math.random().toString(36).substring(2, 7)}`;
 
       const result = await pool.query(
         `INSERT INTO meetings (
@@ -100,29 +130,33 @@ router.post('/', async (req: Request, res: Response) => {
       meeting_time,
       meeting_type: meeting_type || 'video',
       status: 'scheduled',
-      meeting_link: `https://meet.google.com/afq-${Math.random().toString(36).substring(2, 7)}`,
+      meeting_link: meetingLink,
       notes,
     };
-    inMemoryStore.meetings.unshift(newMeeting);
+    inMemoryStore.meetings.unshift(newMeeting as any);
 
     return res.status(201).json({
       success: true,
       message: 'تم حجز موعد الاستشارة بنجاح',
       data: newMeeting,
     });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+  } catch (error) {
+    return failInternal(res, error);
   }
-});
+  }
+);
 
 /**
- * تحديث حالة الموعد أو إضافة الرابط
+ * تحديث حالة الموعد أو إضافة الرابط — للموظفين فقط
  * PUT /api/meetings/:id
  */
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', requireStaff(), async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const { status, meeting_link, notes, staff_id } = req.body;
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ success: false, error: 'معرّف الموعد غير صالح' });
+    }
+    const { status, meeting_link, notes, staff_id } = req.body || {};
 
     if (isPostgresConnected) {
       const result = await pool.query(
@@ -139,12 +173,19 @@ router.put('/:id', async (req: Request, res: Response) => {
       return res.json({ success: true, message: 'تم تحديث الموعد بنجاح', data: result.rows[0] });
     }
 
-    const index = inMemoryStore.meetings.findIndex(m => m.id === id);
+    const list = inMemoryStore.meetings as any[];
+    const index = list.findIndex((m) => m.id === id);
     if (index === -1) return res.status(404).json({ success: false, error: 'الموعد غير موجود' });
-    inMemoryStore.meetings[index] = { ...inMemoryStore.meetings[index], ...req.body };
-    return res.json({ success: true, message: 'تم تحديث الموعد بنجاح', data: inMemoryStore.meetings[index] });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+
+    const target = list[index];
+    if (status !== undefined) target.status = status;
+    if (meeting_link !== undefined) target.meeting_link = meeting_link;
+    if (notes !== undefined) target.notes = notes;
+    if (staff_id !== undefined) target.staff_id = staff_id;
+
+    return res.json({ success: true, message: 'تم تحديث الموعد بنجاح', data: target });
+  } catch (error) {
+    return failInternal(res, error);
   }
 });
 

@@ -538,7 +538,7 @@ export default function App() {
                             <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
                             <span className="absolute top-3 right-3 text-2xl">{flag}</span>
                             <div className="absolute bottom-3 inset-x-3 text-start">
-                              <span className="text-[10px] font-bold text-amber-400 bg-slate-950/80 px-2 py-0.5 rounded">
+                              <span className="text-xs font-bold text-amber-400 bg-slate-950/80 px-2 py-0.5 rounded">
                                 {isAr ? 'وجهة معتمدة للابتعاث' : 'Accredited Destination'}
                               </span>
                               <h3 className="text-lg font-bold text-white mt-1">
@@ -717,9 +717,9 @@ export default function App() {
                       }`}>
                         <div>
                           <div className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{isAr ? testi.nameAr : testi.nameEn}</div>
-                          <div className="text-[11px] opacity-70">{isAr ? testi.cityAr : testi.cityEn}</div>
+                          <div className="text-xs opacity-70">{isAr ? testi.cityAr : testi.cityEn}</div>
                         </div>
-                        <span className={`text-[10px] px-2.5 py-1 rounded font-semibold border ${
+                        <span className={`text-xs px-2.5 py-1 rounded font-semibold border ${
                           isDark ? 'bg-slate-800 text-amber-300 border-slate-700' : 'bg-amber-50 text-amber-700 border-amber-200'
                         }`}>
                           {testi.university}

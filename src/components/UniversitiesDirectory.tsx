@@ -210,11 +210,11 @@ export const UniversitiesDirectory: React.FC<UniversitiesDirectoryProps> = ({
                     {/* Quick Stats */}
                     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/40">
                       <div className={`p-2 rounded-xl text-xs ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-                        <span className="text-slate-400 block text-[10px] uppercase font-bold">{isAr ? 'الرسوم التقديرية' : 'Est. Tuition'}</span>
+                        <span className="text-slate-400 block text-xs uppercase font-bold">{isAr ? 'الرسوم التقديرية' : 'Est. Tuition'}</span>
                         <span className="font-bold text-amber-500">{univ.cost_info || 'تنافسية'}</span>
                       </div>
                       <div className={`p-2 rounded-xl text-xs ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-                        <span className="text-slate-400 block text-[10px] uppercase font-bold">{isAr ? 'نسبة القبول' : 'Acceptance'}</span>
+                        <span className="text-slate-400 block text-xs uppercase font-bold">{isAr ? 'نسبة القبول' : 'Acceptance'}</span>
                         <span className="font-bold text-emerald-400">{univ.acceptance_rate || 'سريعة ومضمونة'}</span>
                       </div>
                     </div>
@@ -222,13 +222,13 @@ export const UniversitiesDirectory: React.FC<UniversitiesDirectoryProps> = ({
                     {/* Majors Sample */}
                     {univ.majors && univ.majors.length > 0 && (
                       <div className="space-y-1.5">
-                        <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                        <span className="text-xs font-bold text-slate-400 flex items-center gap-1">
                           <BookOpen className="w-3 h-3 text-amber-500" />
                           {isAr ? 'أبرز البرامج المتاحة:' : 'Popular Majors:'}
                         </span>
                         <div className="flex flex-wrap gap-1">
                           {univ.majors.slice(0, 3).map((m) => (
-                            <span key={m.id} className={`text-[10px] px-2 py-0.5 rounded-md border font-medium ${
+                            <span key={m.id} className={`text-xs px-2 py-0.5 rounded-md border font-medium ${
                               isDark ? 'bg-slate-800/80 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
                             }`}>
                               {isAr ? m.name_ar : m.name_en}

@@ -266,7 +266,7 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW();`;
                       isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
                     }`}
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">يظهر في ترويسة الموقع وتذييله وأزرار الاتصال</p>
+                  <p className="text-xs text-slate-400 mt-1">يظهر في ترويسة الموقع وتذييله وأزرار الاتصال</p>
                 </div>
 
                 <div>
@@ -283,7 +283,7 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW();`;
                       isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
                     }`}
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">الرقم الذي تُفتح محادثة الواتساب معه مباشرة</p>
+                  <p className="text-xs text-slate-400 mt-1">الرقم الذي تُفتح محادثة الواتساب معه مباشرة</p>
                 </div>
               </div>
 
@@ -486,12 +486,12 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW();`;
                             <span className="text-xs font-black">{isAr ? color.nameAr : color.nameEn}</span>
                           </div>
                           {isSelected && (
-                            <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black">
+                            <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 text-xs font-black">
                               {isAr ? 'مُفعل' : 'Active'}
                             </span>
                           )}
                         </div>
-                        <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                           {isAr ? color.descAr : color.descEn}
                         </p>
                       </button>
@@ -525,7 +525,7 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW();`;
                         )}
                         <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${settings.theme_contrast_mode === 'high' ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
                       </span>
-                      <span className={`text-[11px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                      <span className={`text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
                         settings.theme_contrast_mode === 'high'
                           ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/25'
                           : 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
@@ -574,7 +574,7 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW();`;
                     }`}
                   >
                     <span className="font-bold text-xs">{isAr ? '1. التباين القياسي المتوازن' : '1. Standard Balanced Contrast'}</span>
-                    <span className={`text-[10px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <span className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                       {isAr ? 'ألوان ناعمة ومريحة للعين في ظروف الإضاءة القياسية.' : 'Soft and gentle colors for everyday normal lighting.'}
                     </span>
                   </button>
@@ -592,7 +592,7 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW();`;
                     }`}
                   >
                     <span className="font-bold text-xs text-amber-500">{isAr ? '2. تباين فائق وعالي الوضوح' : '2. Ultra High Contrast'}</span>
-                    <span className={`text-[10px] mt-1 ${isDark ? 'text-slate-300' : 'text-slate-650'}`}>
+                    <span className={`text-xs mt-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                       {isAr ? 'يغمق النصوص الرمادية الباهتة في النهار ويفتحها بالليل للقراءة المريحة بنسبة 100%.' : 'Darkens faded gray text in light mode and clarifies borders.'}
                     </span>
                   </button>
@@ -646,7 +646,7 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW();`;
               {/* ⛔ أُزيلت حقول توكن تلغرام من الواجهة نهائياً.
                   الأسرار لا تُخزَّن في قاعدة بيانات يقرأها المتصفح ولا تُحرَّر من العميل.
                   تُضبط من متغيرات البيئة على السيرفر. */}
-              <div className={`p-3 rounded-xl border text-[11px] leading-relaxed ${
+              <div className={`p-3 rounded-xl border text-xs leading-relaxed ${
                 isDark ? 'border-slate-800 bg-slate-950/60 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-600'
               }`}>
                 {isAr
@@ -658,7 +658,7 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW();`;
 
           {/* Save Button */}
           <div className="pt-4 border-t border-slate-800/50 flex items-center justify-between">
-            <div className="text-[11px] text-slate-400">
+            <div className="text-xs text-slate-400">
               {isAr 
                 ? 'يتم تطبيق الحفظ فوراً في PostgreSQL وتحديث كافة أقسام الموقع بدون إعادة تشغيل.' 
                 : 'Changes are written directly to PostgreSQL and update live immediately.'}

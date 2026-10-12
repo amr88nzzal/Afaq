@@ -187,14 +187,40 @@ router.put('/', requireAdmin, async (req: Request, res: Response) => {
       }
     }
 
-    // إذا تم تعديل شريط التنبيه في الإعدادات، نحدّث الفقرة المناظرة
+    // مزامنة شريط التنبيه مع فقرة الـ CMS.
+    //
+    // ⚠️ كانت هذه المزامنة تُحدّث المخزن في الذاكرة فقط **ولا تكتب في جدول
+    // paragraphs في PostgreSQL**، فبقي النص القديم معروضاً على الموقع الحيّ:
+    // الشريط عرض «55%» بينما الإعدادات تقول «40%»، وأي تعديل من لوحة التحكم
+    // لم يكن يظهر إطلاقاً. الآن تُكتب القيمة في القاعدة أيضاً.
     if (accepted.announcement_banner_ar || accepted.announcement_banner_en) {
-      const annIndex = inMemoryStore.paragraphs.findIndex(
-        (p) => p.slug === 'announcement' || p.slug === 'announcement_banner'
-      );
+      const annSlugs = ['announcement', 'announcement_banner'];
+      const annIndex = inMemoryStore.paragraphs.findIndex((p) => annSlugs.includes(p.slug));
       if (annIndex >= 0) {
         if (accepted.announcement_banner_ar) inMemoryStore.paragraphs[annIndex].text_ar = accepted.announcement_banner_ar;
         if (accepted.announcement_banner_en) inMemoryStore.paragraphs[annIndex].text_en = accepted.announcement_banner_en;
+      }
+
+      if (isPostgresConnected) {
+        try {
+          for (const slug of annSlugs) {
+            const upd = await pool.query(
+              `UPDATE paragraphs
+                  SET text_ar = COALESCE($2, text_ar),
+                      text_en = COALESCE($3, text_en),
+                      updated_at = NOW()
+                WHERE slug = $1`,
+              [slug, accepted.announcement_banner_ar || null, accepted.announcement_banner_en || null]
+            );
+            if (upd.rowCount && upd.rowCount > 0) {
+              console.log(`🔄 [Settings] تمت مزامنة فقرة التنبيه "${slug}" مع الإعدادات`);
+            }
+          }
+        } catch (syncErr) {
+          // لا نُفشل حفظ الإعدادات بسبب فشل المزامنة؛ الشريط يقرأ من
+          // الإعدادات أولاً، والفقرة احتياطية فقط.
+          console.warn('⚠️ [Settings] تعذّرت مزامنة فقرة التنبيه مع قاعدة البيانات:', syncErr);
+        }
       }
     }
 

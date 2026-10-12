@@ -413,7 +413,7 @@ export const ResearchSection: React.FC<ResearchSectionProps> = ({
                 <Award className="w-4 h-4" />
                 <span>{isAr ? '1. سياسة رسوم القبول للطالب' : '1. Student Pricing Policy'}</span>
               </div>
-              <p className={`text-[11px] leading-relaxed ${
+              <p className={`text-xs leading-relaxed ${
                 isDark ? 'text-slate-300' : 'text-slate-600'
               }`}>
                 {isAr ? 'كيف ترغب في تقديم خدمات آفاق للطلاب المتقدمين؟' : 'Which monetization model matches your agency?'}
@@ -428,7 +428,7 @@ export const ResearchSection: React.FC<ResearchSectionProps> = ({
                   }`}
                 >
                   <div className="font-bold">{isAr ? '✓ مجاني 100% (موصى به)' : '✓ 100% Free (Recommended)'}</div>
-                  <div className="text-[10px] opacity-85">{isAr ? 'عمولة التقديم مغطاة بالكامل من الجامعات' : 'Commissions paid by institutions'}</div>
+                  <div className="text-xs opacity-85">{isAr ? 'عمولة التقديم مغطاة بالكامل من الجامعات' : 'Commissions paid by institutions'}</div>
                 </button>
                 <button
                   onClick={() => setFeeModel('freemium_vip')}
@@ -439,7 +439,7 @@ export const ResearchSection: React.FC<ResearchSectionProps> = ({
                   }`}
                 >
                   <div className="font-bold">{isAr ? 'باقات VIP مدفوعة' : 'Freemium + VIP Concierge'}</div>
-                  <div className="text-[10px] opacity-85">{isAr ? 'القبول مجاني + باقة مدفوعة للسكن والتأشيرة' : 'Free admission + paid relocation'}</div>
+                  <div className="text-xs opacity-85">{isAr ? 'القبول مجاني + باقة مدفوعة للسكن والتأشيرة' : 'Free admission + paid relocation'}</div>
                 </button>
               </div>
             </div>
@@ -452,7 +452,7 @@ export const ResearchSection: React.FC<ResearchSectionProps> = ({
                 <MessageSquare className="w-4 h-4" />
                 <span>{isAr ? '2. قناة التنبيهات الفورية المفضلة' : '2. Primary Notification Route'}</span>
               </div>
-              <p className={`text-[11px] leading-relaxed ${
+              <p className={`text-xs leading-relaxed ${
                 isDark ? 'text-slate-300' : 'text-slate-600'
               }`}>
                 {isAr ? 'أي وسيلة ترغب بجعلها قناة الإشعارات الأولى للطالب؟' : 'How should admission status changes notify students?'}
@@ -467,7 +467,7 @@ export const ResearchSection: React.FC<ResearchSectionProps> = ({
                   }`}
                 >
                   <div className="font-bold">{isAr ? '✓ ثلاثية شاملة (Omnichannel)' : '✓ Omnichannel (All 3)'}</div>
-                  <div className="text-[10px] opacity-85">{isAr ? 'واتساب + تلغرام + بريد معاً لضمان الوصول' : 'WhatsApp + Telegram + Email'}</div>
+                  <div className="text-xs opacity-85">{isAr ? 'واتساب + تلغرام + بريد معاً لضمان الوصول' : 'WhatsApp + Telegram + Email'}</div>
                 </button>
                 <button
                   onClick={() => setPrimaryAlertChannel('whatsapp_first')}
@@ -478,7 +478,7 @@ export const ResearchSection: React.FC<ResearchSectionProps> = ({
                   }`}
                 >
                   <div className="font-bold">{isAr ? 'واتساب أولاً (WhatsApp First)' : 'WhatsApp First'}</div>
-                  <div className="text-[10px] opacity-85">{isAr ? 'إرسال قوالب رسمية معتمدة' : 'Official WhatsApp Business alerts'}</div>
+                  <div className="text-xs opacity-85">{isAr ? 'إرسال قوالب رسمية معتمدة' : 'Official WhatsApp Business alerts'}</div>
                 </button>
               </div>
             </div>
@@ -491,7 +491,7 @@ export const ResearchSection: React.FC<ResearchSectionProps> = ({
                 <Compass className="w-4 h-4" />
                 <span>{isAr ? '3. برامج الابتعاث الحكومي الخليجي' : '3. GCC Government Scholarships'}</span>
               </div>
-              <p className={`text-[11px] leading-relaxed ${
+              <p className={`text-xs leading-relaxed ${
                 isDark ? 'text-slate-300' : 'text-slate-600'
               }`}>
                 {isAr ? 'هل نبرز شروط مسارات الابتعاث الحكومي في الصفحة الأولى؟' : 'Highlight official GCC scholarship pathways?'}
@@ -506,7 +506,7 @@ export const ResearchSection: React.FC<ResearchSectionProps> = ({
                   }`}
                 >
                   <div className="font-bold">{isAr ? '✓ نعم، إبرازها بقوة' : '✓ Yes, Highlight Strongly'}</div>
-                  <div className="text-[10px] opacity-85">{isAr ? 'مسار الرواد، بعثات الإمارات، الكويت، عمان' : 'KAUST, Saudi Custodian, UAE, Kuwait'}</div>
+                  <div className="text-xs opacity-85">{isAr ? 'مسار الرواد، بعثات الإمارات، الكويت، عمان' : 'KAUST, Saudi Custodian, UAE, Kuwait'}</div>
                 </button>
                 <button
                   onClick={() => setScholarshipHighlight(false)}
@@ -517,7 +517,7 @@ export const ResearchSection: React.FC<ResearchSectionProps> = ({
                   }`}
                 >
                   <div className="font-bold">{isAr ? 'التركيز على الطلاب ذوي التمويل الخاص' : 'Focus on Self-Funded'}</div>
-                  <div className="text-[10px] opacity-85">{isAr ? 'تسهيلات الدفع والمنح الجامعية المباشرة' : 'Direct university merit discounts'}</div>
+                  <div className="text-xs opacity-85">{isAr ? 'تسهيلات الدفع والمنح الجامعية المباشرة' : 'Direct university merit discounts'}</div>
                 </button>
               </div>
             </div>
@@ -530,7 +530,7 @@ export const ResearchSection: React.FC<ResearchSectionProps> = ({
                 <Zap className="w-4 h-4" />
                 <span>{isAr ? '4. اعتماد الشعار النشط (7 خيارات)' : '4. Active Logo Selection'}</span>
               </div>
-              <p className={`text-[11px] leading-relaxed ${
+              <p className={`text-xs leading-relaxed ${
                 isDark ? 'text-slate-300' : 'text-slate-600'
               }`}>
                 {isAr ? 'اختر أي شعار ترغب في اعتماده حالياً وتجربته حياً:' : 'Select which concept to preview active site-wide:'}
@@ -550,7 +550,7 @@ export const ResearchSection: React.FC<ResearchSectionProps> = ({
                 <option value={6}>{isAr ? 'الخيار 6: التاج الأكاديمي والكرة الأرضية' : 'Option 6: Academic Globe & Crest'}</option>
                 <option value={7}>{isAr ? 'الخيار 7: طريق الآفاق الممتد المبسط' : 'Option 7: Modern Highway & Star'}</option>
               </select>
-              <div className="text-[11px] text-emerald-500 font-medium pt-1">
+              <div className="text-xs text-emerald-500 font-medium pt-1">
                 {isAr ? '✦ يمكنك الانتقال لصفحة الإدارة لمعاينة "مختبر الشعارات" بتفاصيل أعمق' : '✦ Check the Logo Lab tab in Admin panel to compare all 7 in high fidelity'}
               </div>
             </div>

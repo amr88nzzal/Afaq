@@ -138,8 +138,10 @@ export const Footer: React.FC<FooterProps> = ({
                 rel="noreferrer" 
                 className="px-3 py-1.5 rounded-lg bg-emerald-600/15 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-600/25 transition-colors flex items-center gap-1.5 font-bold"
               >
-                <MessageCircle className="w-3.5 h-3.5 fill-current" />
-                <span>واتساب {rawWhatsapp}</span>
+                <MessageCircle className="w-3.5 h-3.5 fill-current" aria-hidden="true" />
+                <span>واتساب</span>
+                {/* dir="ltr" لمنع عرض الرقم وعلامة + معكوسين في سياق RTL */}
+                <span dir="ltr" className="inline-block tabular-nums">{rawWhatsapp.trim()}</span>
               </a>
               <a 
                 href="https://t.me/Afaq_Abdulrahman" 
@@ -223,7 +225,7 @@ export const Footer: React.FC<FooterProps> = ({
                     window.location.hash = 'admin';
                     onNavigate('staff-crm');
                   }} 
-                  className="hover:text-amber-500 transition-colors flex items-center gap-1.5 opacity-70 hover:opacity-100 text-[11px]"
+                  className="hover:text-amber-500 transition-colors flex items-center gap-1.5 opacity-70 hover:opacity-100 text-xs"
                 >
                   <Lock className="w-3 h-3 text-amber-500" />
                   <span>{isAr ? 'بوابة المدراء والمشرفين (./admin)' : 'Staff & Admins Portal (./admin)'}</span>
@@ -261,7 +263,7 @@ export const Footer: React.FC<FooterProps> = ({
 
         {/* Bottom copyright */}
         <div className={`border-t mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs ${
-          isDark ? 'border-slate-800 text-slate-500' : 'border-slate-300 text-slate-500'
+          isDark ? 'border-slate-800 text-slate-400' : 'border-slate-300 text-slate-500'
         }`}>
           <div>
             © 2026 {companyName}. {isAr ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}

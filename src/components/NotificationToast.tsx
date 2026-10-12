@@ -63,10 +63,10 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
 
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${channelConfig.badgeBg}`}>
+                <span className={`px-2 py-0.5 rounded text-xs font-black uppercase tracking-wider ${channelConfig.badgeBg}`}>
                   {channelConfig.channelName}
                 </span>
-                <span className="text-[10px] text-slate-400 font-mono">
+                <span className="text-xs text-slate-400 font-mono">
                   {notification.timestamp}
                 </span>
               </div>
@@ -91,7 +91,7 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
           </button>
         </div>
 
-        <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between text-[11px]">
+        <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between text-xs">
           <span className="text-slate-400">
             {isAr ? 'تم إرسال هذا التنبيه الفوري بنجاح' : 'Push alert delivered successfully'}
           </span>

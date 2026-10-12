@@ -127,7 +127,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               </div>
               <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black backdrop-blur-md border ${
                 isDark 
-                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' 
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-200' 
                   : 'bg-emerald-50 border-emerald-300 text-emerald-800 shadow-sm'
               }`}>
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -161,7 +161,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 <Shield className="w-5 h-5 text-emerald-500 shrink-0" />
                 <div className="text-xs">
                   <div className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{isAr ? 'قبولات رسمية 100%' : '100% Official Offers'}</div>
-                  <div className={`${isDark ? 'text-slate-400' : 'text-slate-500'} text-[11px]`}>{isAr ? 'عقود تمثيل جامعية مباشرة' : 'Direct university contracts'}</div>
+                  <div className={`${isDark ? 'text-slate-400' : 'text-slate-500'} text-xs`}>{isAr ? 'عقود تمثيل جامعية مباشرة' : 'Direct university contracts'}</div>
                 </div>
               </div>
 
@@ -173,7 +173,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 <Award className="w-5 h-5 text-amber-500 shrink-0" />
                 <div className="text-xs">
                   <div className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{isAr ? 'معتمد في دول الخليج' : 'GCC Accredited'}</div>
-                  <div className={`${isDark ? 'text-slate-400' : 'text-slate-500'} text-[11px]`}>{isAr ? 'متوافق مع شروط وزارات التعليم' : 'Ministry scholarship compliant'}</div>
+                  <div className={`${isDark ? 'text-slate-400' : 'text-slate-500'} text-xs`}>{isAr ? 'متوافق مع شروط وزارات التعليم' : 'Ministry scholarship compliant'}</div>
                 </div>
               </div>
 
@@ -185,7 +185,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 <Clock className="w-5 h-5 text-blue-500 shrink-0" />
                 <div className="text-xs">
                   <div className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{isAr ? 'إصدار سريع خلال 48-72 ساعة' : 'Fast 48-72h Turnaround'}</div>
-                  <div className={`${isDark ? 'text-slate-400' : 'text-slate-500'} text-[11px]`}>{isAr ? 'لبرامج اللغة والسنة التحضيرية' : 'For English & Foundation'}</div>
+                  <div className={`${isDark ? 'text-slate-400' : 'text-slate-500'} text-xs`}>{isAr ? 'لبرامج اللغة والسنة التحضيرية' : 'For English & Foundation'}</div>
                 </div>
               </div>
             </div>
@@ -257,12 +257,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                     <h3 className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>
                       {isAr ? 'حاسبة القبول والفرص الأكاديمية' : 'Quick Admission Matcher'}
                     </h3>
-                    <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                       {isAr ? 'تقييم فوري خلال 30 ثانية' : 'Instant 30-second eligibility check'}
                     </p>
                   </div>
                 </div>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                <span className={`px-2 py-0.5 rounded text-xs font-bold border ${
                   isDark 
                     ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
                     : 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -336,7 +336,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       <button
                         type="button"
                         onClick={() => setGpaLevel('high')}
-                        className={`py-2 px-2 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                        className={`py-2 px-2 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
                           gpaLevel === 'high' 
                             ? 'bg-blue-600 text-white border-blue-500 shadow-sm' 
                             : isDark 
@@ -349,7 +349,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       <button
                         type="button"
                         onClick={() => setGpaLevel('medium')}
-                        className={`py-2 px-2 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                        className={`py-2 px-2 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
                           gpaLevel === 'medium' 
                             ? 'bg-blue-600 text-white border-blue-500 shadow-sm' 
                             : isDark 
@@ -362,7 +362,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       <button
                         type="button"
                         onClick={() => setGpaLevel('need_foundation')}
-                        className={`py-2 px-2 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                        className={`py-2 px-2 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
                           gpaLevel === 'need_foundation' 
                             ? 'bg-blue-600 text-white border-blue-500 shadow-sm' 
                             : isDark 
@@ -419,7 +419,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                       <span>{isAr ? 'فرص قبولك ممتازة بنسبة 96%!' : 'Admission Match Rate: 96%!'}</span>
                     </div>
-                    <p className={`text-[11px] leading-relaxed ${
+                    <p className={`text-xs leading-relaxed ${
                       isDark ? 'text-emerald-200/90' : 'text-emerald-800'
                     }`}>
                       {isAr 
@@ -433,7 +433,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       ? 'bg-slate-800/80 border-slate-700 text-slate-200' 
                       : 'bg-slate-50 border-slate-200 text-slate-800'
                   }`}>
-                    <div className={`font-bold text-[11px] border-b pb-1 ${
+                    <div className={`font-bold text-xs border-b pb-1 ${
                       isDark ? 'text-slate-300 border-slate-700' : 'text-slate-700 border-slate-200'
                     }`}>
                       {isAr ? 'الجامعات المقترحة لملفك الأكاديمي:' : 'Top Matched Universities:'}
@@ -442,7 +442,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       <span className="font-semibold">
                         {selectedCountry === 'uk' ? 'جامعة مانشستر / ليدز' : selectedCountry === 'australia' ? 'جامعة ملبورن / سيدني' : 'جامعة أوكلاند'}
                       </span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                      <span className={`text-xs px-1.5 py-0.5 rounded border ${
                         isDark 
                           ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' 
                           : 'text-amber-800 bg-amber-100 border-amber-300'
@@ -454,7 +454,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       <span className="font-semibold">
                         {selectedCountry === 'uk' ? 'جامعة برمنجهام / بريستول' : selectedCountry === 'australia' ? 'جامعة موناش / كوينزلاند' : 'جامعة أوتاجو'}
                       </span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                      <span className={`text-xs px-1.5 py-0.5 rounded border ${
                         isDark 
                           ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' 
                           : 'text-emerald-800 bg-emerald-100 border-emerald-300'
@@ -474,7 +474,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                     </button>
                     <button
                       onClick={() => setCalculatedResult(false)}
-                      className={`w-full py-2 rounded-lg text-[11px] text-center cursor-pointer transition-colors ${
+                      className={`w-full py-2 rounded-lg text-xs text-center cursor-pointer transition-colors ${
                         isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-800'
                       }`}
                     >

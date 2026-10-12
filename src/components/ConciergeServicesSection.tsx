@@ -297,7 +297,7 @@ export const ConciergeServicesSection: React.FC<ConciergeServicesSectionProps> =
                     <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
                       {getServiceIcon(svc.category)}
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
                       {isAr ? 'اختياري بعد القبول' : 'Optional'}
                     </span>
                   </div>
@@ -313,7 +313,7 @@ export const ConciergeServicesSection: React.FC<ConciergeServicesSectionProps> =
 
                   <div className="space-y-1.5 pt-2 border-t border-slate-800/60">
                     {(isAr ? svc.includedItemsAr : svc.includedItemsEn).map((inc, i) => (
-                      <div key={i} className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                      <div key={i} className="flex items-center gap-1.5 text-xs text-slate-400">
                         <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
                         <span className="truncate">{inc}</span>
                       </div>
@@ -323,7 +323,7 @@ export const ConciergeServicesSection: React.FC<ConciergeServicesSectionProps> =
 
                 <div className="pt-4 mt-4 border-t border-slate-800/60 flex items-center justify-between">
                   <div>
-                    <div className="text-[10px] text-slate-400">{isAr ? 'التكلفة الرمزية:' : 'Fixed Cost:'}</div>
+                    <div className="text-xs text-slate-400">{isAr ? 'التكلفة الرمزية:' : 'Fixed Cost:'}</div>
                     <div className="text-xs font-black text-amber-500">
                       {isAr ? svc.estimatedCostAr : svc.estimatedCostEn}
                     </div>

@@ -116,7 +116,7 @@ export const MeetingsManager: React.FC<MeetingsManagerProps> = ({ lang, theme })
                 </h3>
                 <div className="mt-2 space-y-1 text-xs text-slate-400">
                   <p>{m.customer_email}</p>
-                  <p>{m.customer_phone}</p>
+                  <p dir="ltr" className="inline-block tabular-nums">{m.customer_phone}</p>
                   {m.destination_country && (
                     <p className="text-amber-400 font-semibold">{isAr ? 'الوجهة:' : 'Destination:'} {m.destination_country}</p>
                   )}

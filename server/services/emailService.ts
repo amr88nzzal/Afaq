@@ -13,10 +13,41 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// ============================================================================
+// حماية قوالب البريد من الحقن (HTML Injection / Email Template Injection)
+// ============================================================================
+// كان كل حقل قادم من المستخدم (اسم الطالب، الهاتف، نص الرسالة...) يُدرَج في
+// قوالب HTML بلا تهريب. أي شخص يقدّم طلباً باسم يحتوي وسوم HTML كان يستطيع
+// حقن روابط أو نماذج تصيّد تظهر كأنها صادرة رسمياً من بريد المنصة.
+// esc() تُهرّب المحارف الخطرة، وstripNewlines() تمنع حقن ترويسات البريد.
+function escapeEntities(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * التهريب الافتراضي: يُهرّب المحارف الخطرة ويستبدل نهايات الأسطر بمسافة.
+ * استبدال نهايات الأسطر يحمي أيضاً من حقن ترويسات البريد (Header Injection)
+ * في حال استُخدمت القيمة داخل عنوان الرسالة (subject).
+ */
+function esc(value: unknown): string {
+  return escapeEntities(value).replace(/[\r\n]+/g, ' ');
+}
+
+/** الحفاظ على أسطر النص بعد التهريب (للحقول متعددة الأسطر في جسم HTML) */
+function escMultiline(value: unknown): string {
+  return escapeEntities(value).replace(/\r?\n/g, '<br>');
+}
+
 // قراءة إعدادات الجيميل من متغيرات البيئة
 const GMAIL_USER = process.env.GMAIL_USER || process.env.SMTP_USER || 'admissions@afaq-global.amrodev.com';
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || '';
-const ADMIN_EMAILS = process.env.ADMIN_NOTIFICATION_EMAILS || 'admin@amrodev.com, amr.nzzal@gmail.com';
+const ADMIN_EMAILS = process.env.ADMIN_NOTIFICATION_EMAILS || 'admin@amrodev.com';
 
 // إنشاء ناقل البريد (Transporter)
 let transporter: Transporter | null = null;
@@ -102,19 +133,19 @@ export async function sendNewApplicationEmailToAdmin(data: ApplicationEmailPaylo
           <table class="info-table">
             <tr>
               <td class="label">رقم الطلب:</td>
-              <td class="value" style="color: #d97706;">${data.applicationNumber}</td>
+              <td class="value" style="color: #d97706;">${esc(data.applicationNumber)}</td>
             </tr>
             <tr>
               <td class="label">اسم الطالب:</td>
-              <td class="value">${data.studentName}</td>
+              <td class="value">${esc(data.studentName)}</td>
             </tr>
             <tr>
               <td class="label">رقم الهاتف:</td>
-              <td class="value" dir="ltr" style="text-align: right;">${data.phone}</td>
+              <td class="value" dir="ltr" style="text-align: right;">${esc(data.phone)}</td>
             </tr>
             <tr>
               <td class="label">البريد الإلكتروني:</td>
-              <td class="value" dir="ltr" style="text-align: right;">${data.email}</td>
+              <td class="value" dir="ltr" style="text-align: right;">${esc(data.email)}</td>
             </tr>
             <tr>
               <td class="label">الدولة المستهدفة:</td>
@@ -126,13 +157,13 @@ export async function sendNewApplicationEmailToAdmin(data: ApplicationEmailPaylo
             </tr>
             <tr>
               <td class="label">التخصص المطلوب:</td>
-              <td class="value">${data.preferredMajor || 'لم يحدد بعد'}</td>
+              <td class="value">${esc(data.preferredMajor || 'لم يحدد بعد')}</td>
             </tr>
             <tr>
               <td class="label">الجامعة المرغوبة:</td>
-              <td class="value">${data.preferredUniversity || 'استشارة مفتوحة'}</td>
+              <td class="value">${esc(data.preferredUniversity || 'استشارة مفتوحة')}</td>
             </tr>
-            ${data.gpa ? `<tr><td class="label">المعدل التراكمي (GPA):</td><td class="value">${data.gpa}</td></tr>` : ''}
+            ${data.gpa ? `<tr><td class="label">المعدل التراكمي (GPA):</td><td class="value">${esc(data.gpa)}</td></tr>` : ''}
           </table>
 
           <div style="text-align: center; margin-top: 24px;">
@@ -148,7 +179,7 @@ export async function sendNewApplicationEmailToAdmin(data: ApplicationEmailPaylo
   `;
 
   if (!transporter) {
-    console.log(`📨 [Email Simulated] إشعار بريدي صادر إلى [${ADMIN_EMAILS}] للطلب (${data.applicationNumber} - ${data.studentName})`);
+    console.log(`📨 [Email Simulated] إشعار بريدي صادر إلى [${ADMIN_EMAILS}] للطلب (${esc(data.applicationNumber)} - ${esc(data.studentName)})`);
     return {
       success: true,
       message: 'تم تسجيل إشعار البريد (وضع المحاكاة - بانتظار إدخال GMAIL_APP_PASSWORD في ملف .env)',
@@ -159,7 +190,7 @@ export async function sendNewApplicationEmailToAdmin(data: ApplicationEmailPaylo
     const info = await transporter.sendMail({
       from: `"Afaq Global Admissions" <${GMAIL_USER}>`,
       to: ADMIN_EMAILS,
-      subject: `🎓 طلب جديد [${data.applicationNumber}] - ${data.studentName} (${destinationText})`,
+      subject: `🎓 طلب جديد [${esc(data.applicationNumber)}] - ${esc(data.studentName)} (${destinationText})`,
       html: htmlContent,
     });
     console.log(`✅ [Email Sent] تم إرسال إيميل التنبيه بنجاح. معرف الرسالة: ${info.messageId}`);
@@ -210,17 +241,17 @@ export async function sendStudentCredentialsEmail(data: {
           <p style="margin: 6px 0 0 0; font-size: 14px; opacity: 0.9;">بوابتك المعتمدة للجامعات العريقة</p>
         </div>
         <div class="content">
-          <p style="font-size: 16px;">مرحباً <strong>${data.studentName}</strong>،</p>
+          <p style="font-size: 16px;">مرحباً <strong>${esc(data.studentName)}</strong>،</p>
           <p>يسرنا إبلاغك بأنه تم تسجيل واستلام طلب قبولك الأكاديمي بنجاح، وتعيين مستشار أكاديمي مختص لمتابعة ملفك لدى عمادات القبول بالجامعات الشريكة.</p>
           
           <div class="cred-card">
             <div style="margin-bottom: 14px;">
               <div class="cred-label">رقم الطلب الخاص بك (Application Number):</div>
-              <div class="cred-val" style="color: #d97706;">${data.applicationNumber}</div>
+              <div class="cred-val" style="color: #d97706;">${esc(data.applicationNumber)}</div>
             </div>
             <div>
               <div class="cred-label">كلمة المرور الافتراضية لبوابة الطالب (Portal Password):</div>
-              <div class="cred-val" style="color: #2563eb;">${data.portalPassword}</div>
+              <div class="cred-val" style="color: #2563eb;">${esc(data.portalPassword)}</div>
             </div>
           </div>
 
@@ -242,7 +273,7 @@ export async function sendStudentCredentialsEmail(data: {
   `;
 
   if (!transporter) {
-    console.log(`📨 [Email Simulated] إرسال بيانات دخول الطالب إلى [${data.studentEmail}]: طلب ${data.applicationNumber} - كلمة المرور: ${data.portalPassword}`);
+    console.log(`📨 [Email Simulated] إرسال بيانات دخول الطالب إلى [${data.studentEmail}]: طلب ${esc(data.applicationNumber)} - كلمة المرور: ${esc(data.portalPassword)}`);
     return {
       success: true,
       message: 'تم إرسال بيانات الدخول (وضع المحاكاة)',
@@ -253,7 +284,7 @@ export async function sendStudentCredentialsEmail(data: {
     const info = await transporter.sendMail({
       from: `"Afaq Global Admissions" <${GMAIL_USER}>`,
       to: data.studentEmail,
-      subject: `🎓 بيانات دخول بوابة متابعة طلبك [${data.applicationNumber}] - آفاق العالمية`,
+      subject: `🎓 بيانات دخول بوابة متابعة طلبك [${esc(data.applicationNumber)}] - آفاق العالمية`,
       html: htmlContent,
     });
     console.log(`✅ [Student Email Sent] تم إرسال بيانات الدخول للطالب (${data.studentEmail}): ${info.messageId}`);
@@ -278,10 +309,10 @@ export async function sendStatusUpdateNotification(data: {
     <head><meta charset="utf-8"></head>
     <body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 20px;">
       <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 24px; border: 1px solid #e2e8f0;">
-        <h2 style="color: #0f172a;">تحديث حالة طلب القبول [${data.applicationNumber}]</h2>
-        <p>عزيزي <strong>${data.studentName}</strong>،</p>
-        <p>تم تحديث حالة طلب قبولك الأكاديمي إلى: <span style="font-weight: bold; color: #d97706;">${data.statusLabelAr || data.newStatus}</span></p>
-        ${data.notes ? `<p style="background: #f1f5f9; padding: 12px; border-radius: 8px;"><strong>ملاحظات المستشار:</strong> ${data.notes}</p>` : ''}
+        <h2 style="color: #0f172a;">تحديث حالة طلب القبول [${esc(data.applicationNumber)}]</h2>
+        <p>عزيزي <strong>${esc(data.studentName)}</strong>،</p>
+        <p>تم تحديث حالة طلب قبولك الأكاديمي إلى: <span style="font-weight: bold; color: #d97706;">${esc(data.statusLabelAr || data.newStatus)}</span></p>
+        ${data.notes ? `<p style="background: #f1f5f9; padding: 12px; border-radius: 8px;"><strong>ملاحظات المستشار:</strong> ${escMultiline(data.notes)}</p>` : ''}
         <p>يمكنك تسجيل الدخول إلى بوابة الطالب لمتابعة كافة تفاصيل القبول ومراحله.</p>
         <p style="color: #64748b; font-size: 12px;">آفاق العالمية للخدمات التعليمية</p>
       </div>
@@ -298,7 +329,7 @@ export async function sendStatusUpdateNotification(data: {
     const info = await transporter.sendMail({
       from: `"Afaq Global Admissions" <${GMAIL_USER}>`,
       to: data.studentEmail,
-      subject: `🔔 تحديث حالة طلبك الجامعي [${data.applicationNumber}] - آفاق العالمية`,
+      subject: `🔔 تحديث حالة طلبك الجامعي [${esc(data.applicationNumber)}] - آفاق العالمية`,
       html: htmlContent,
     });
     return { success: true, message: `Status update email sent: ${info.messageId}` };
@@ -336,14 +367,14 @@ export async function sendCustomStudentEmailResponse(data: {
         <div class="header">
           <div class="badge">إشعار رسمي من قسم القبول والابتعاث 🎓</div>
           <h2 style="margin: 0; font-size: 20px;">آفاق العالمية للخدمات التعليمية</h2>
-          <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.9;">متابعة طلب القبول رقم: ${data.applicationNumber}</p>
+          <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.9;">متابعة طلب القبول رقم: ${esc(data.applicationNumber)}</p>
         </div>
         <div class="content">
-          <p>عزيزي الطالب <strong>${data.studentName}</strong>،</p>
+          <p>عزيزي الطالب <strong>${esc(data.studentName)}</strong>،</p>
           <p>أرسل لك قسم القبول والمتابعة الأكاديمية الرد الرسمي التالي بشأن طلبك:</p>
           
           <div class="msg-box">
-            ${data.messageText}
+            ${escMultiline(data.messageText)}
           </div>
 
           <p style="font-size: 13px; color: #64748b;">
@@ -360,7 +391,7 @@ export async function sendCustomStudentEmailResponse(data: {
   `;
 
   if (!transporter) {
-    console.log(`📨 [Email Simulated] تم إرسال الخطاب الرسمي للطالب [${data.studentEmail}]: ${data.messageText}`);
+    console.log(`📨 [Email Simulated] تم إرسال الخطاب الرسمي للطالب [${data.studentEmail}]: ${escMultiline(data.messageText)}`);
     return { success: true, message: 'تم تسجيل الإيميل بنجاح (وضع المحاكاة الخادمي)' };
   }
 
@@ -368,7 +399,7 @@ export async function sendCustomStudentEmailResponse(data: {
     const info = await transporter.sendMail({
       from: `"Afaq Global Admissions" <${GMAIL_USER}>`,
       to: data.studentEmail,
-      subject: `📧 إشعار رسمي من آفاق بشأن طلبك رقم [${data.applicationNumber}]`,
+      subject: `📧 إشعار رسمي من آفاق بشأن طلبك رقم [${esc(data.applicationNumber)}]`,
       html: htmlContent,
     });
     console.log(`✅ [Custom Email Sent] تم إرسال البريد للطالب (${data.studentEmail}) بنجاح: ${info.messageId}`);

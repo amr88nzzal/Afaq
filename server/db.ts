@@ -2,16 +2,37 @@ import pg from 'pg';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
+import { hashPassword, LOCKED_PASSWORD } from './services/passwordService';
 
 dotenv.config();
 
 const { Pool } = pg;
 
-const databaseUrl = process.env.DATABASE_URL || 'postgres://afaq_user:ChangeMeSecurePassword123@localhost:5432/afaq_db';
+/**
+ * ⛔ أُزيلت كلمة مرور قاعدة البيانات المثبتة في الكود.
+ * كانت القيمة الافتراضية `postgres://afaq_user:ChangeMeSecurePassword123@...`
+ * مكتوبة هنا وفي .env.example، وهي مكشوفة للعامة في المستودع.
+ * الآن: إما DATABASE_URL من متغيّرات البيئة، أو العمل بنظام الذاكرة المتكامل.
+ */
+const databaseUrl = process.env.DATABASE_URL || '';
+
+/**
+ * التحقق من شهادة TLS لقاعدة البيانات.
+ * كان `rejectUnauthorized: false` دائماً عند تفعيل SSL، وهو ما يسمح
+ * بهجوم رجل-في-المنتصف على اتصال قاعدة البيانات.
+ * الآن: التحقق مُفعَّل افتراضياً، ويمكن تعطيله صراحةً لبيئات التطوير فقط.
+ */
+const pgSsl =
+  process.env.PG_SSL === 'true'
+    ? {
+        rejectUnauthorized: process.env.PG_SSL_REJECT_UNAUTHORIZED !== 'false',
+        ...(process.env.PG_SSL_CA ? { ca: process.env.PG_SSL_CA } : {}),
+      }
+    : false;
 
 export const pool = new Pool({
   connectionString: databaseUrl,
-  ssl: process.env.PG_SSL === 'true' ? { rejectUnauthorized: false } : false,
+  ssl: pgSsl,
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
@@ -52,9 +73,9 @@ export const inMemoryStore = {
     { id: 3, name: 'م. ريان القحطاني', email: 'rayan@afaq-global.amrodev.com', phone: '+966 54 321 0987', role: 'counselor', telegram_id: '@rayan_uk', is_active: true },
   ],
   customers: [
-    { id: 1, name: 'عبدالرحمن محمد العتيبي', email: 'abdulrahman.o@example.com', phone: '+966 50 111 2233', whatsapp: '+966 50 111 2233', password_hash: '123456', nationality: 'Saudi', current_status: 'active' },
-    { id: 2, name: 'نورة عبدالله السديري', email: 'noura.s@example.com', phone: '+966 55 444 5566', whatsapp: '+966 55 444 5566', password_hash: '123456', nationality: 'Saudi', current_status: 'active' },
-    { id: 3, name: 'خالد فهد الشمري', email: 'khaled.f@example.com', phone: '+965 99 888 777', whatsapp: '+965 99 888 777', password_hash: '123456', nationality: 'Kuwaiti', current_status: 'active' },
+    { id: 1, name: 'عبدالرحمن محمد العتيبي', email: 'abdulrahman.o@example.com', phone: '+966 50 111 2233', whatsapp: '+966 50 111 2233', password_hash: LOCKED_PASSWORD, nationality: 'Saudi', current_status: 'active' },
+    { id: 2, name: 'نورة عبدالله السديري', email: 'noura.s@example.com', phone: '+966 55 444 5566', whatsapp: '+966 55 444 5566', password_hash: LOCKED_PASSWORD, nationality: 'Saudi', current_status: 'active' },
+    { id: 3, name: 'خالد فهد الشمري', email: 'khaled.f@example.com', phone: '+965 99 888 777', whatsapp: '+965 99 888 777', password_hash: LOCKED_PASSWORD, nationality: 'Kuwaiti', current_status: 'active' },
   ],
   applications: [
     {
@@ -81,7 +102,7 @@ export const inMemoryStore = {
       gpa: '3.92 / 4.00',
       status: 'under_review',
       notes: 'طالب متميز متقدم لبرنامج خادم الحرمين الشريفين للابتعاث الخارجي.',
-      portal_password: '123456',
+      portal_password: LOCKED_PASSWORD,
       created_at: new Date().toISOString(),
       documents: [
         { id: 1, doc_type: 'passport', name_ar: 'جواز السفر ساري المفعول', name_en: 'Valid Passport', status: 'verified', fileName: 'passport_abdulrahman.pdf', fileSize: '2.1 MB', file_url: '/uploads/passports/app1_passport.pdf', uploadedAt: '2026-09-10' },
@@ -117,7 +138,7 @@ export const inMemoryStore = {
       gpa: '98.5%',
       status: 'conditional_offer',
       notes: 'تم الحصول على قبول مشروط بدرجة الآيلتس (المطلوب 6.5).',
-      portal_password: '123456',
+      portal_password: LOCKED_PASSWORD,
       created_at: new Date().toISOString(),
       documents: [
         { id: 5, doc_type: 'passport', name_ar: 'جواز السفر ساري المفعول', name_en: 'Valid Passport', status: 'verified', file_url: '/uploads/passports/app2_passport.pdf' },
@@ -221,6 +242,12 @@ export function loadStoreFromDisk(): void {
 loadStoreFromDisk();
 
 export async function testDbConnection(): Promise<boolean> {
+  // لا يوجد DATABASE_URL — نعمل بنظام الذاكرة المتكامل بدل محاولة اتصال بلا إعداد
+  if (!databaseUrl) {
+    isPostgresConnected = false;
+    console.warn('ℹ️ [Database] لم يتم ضبط DATABASE_URL — يعمل النظام بالذاكرة المتكاملة المحفوظة على القرص.');
+    return false;
+  }
   try {
     const client = await pool.connect();
     const res = await client.query('SELECT NOW()');
@@ -250,6 +277,72 @@ export async function testDbConnection(): Promise<boolean> {
       console.log('✅ [Database] Schema updated: file_url column set to TEXT and file details added.');
     } catch (migErr: any) {
       console.log('ℹ️ [Database] Migration note:', migErr.message);
+    }
+
+    // ترحيل: تحويل أي كلمة مرور مخزّنة كنص صريح إلى "مقفل" حتى تُعاد تهيئتها بأمان.
+    // لا يمكن تحويل النص الصريح إلى بصمة تلقائياً لأننا لا نعرف كلمة المرور الأصلية،
+    // وقبولها كما هي يعني إبقاء الاعتماد على كلمة مرور مكشوفة في المستودع.
+    try {
+      const legacyUsers = await client.query(
+        `SELECT COUNT(*)::int AS n FROM users
+         WHERE password_hash IS NOT NULL AND password_hash <> $1 AND password_hash NOT LIKE 'scrypt$%'`,
+        [LOCKED_PASSWORD]
+      );
+      const legacyCustomers = await client.query(
+        `SELECT COUNT(*)::int AS n FROM customers
+         WHERE password_hash IS NOT NULL AND password_hash <> $1 AND password_hash NOT LIKE 'scrypt$%'`,
+        [LOCKED_PASSWORD]
+      );
+      const legacyCount = (legacyUsers.rows[0]?.n || 0) + (legacyCustomers.rows[0]?.n || 0);
+      if (legacyCount > 0) {
+        await client.query(
+          `UPDATE users SET password_hash = $1
+           WHERE password_hash IS NOT NULL AND password_hash <> $1 AND password_hash NOT LIKE 'scrypt$%'`,
+          [LOCKED_PASSWORD]
+        );
+        await client.query(
+          `UPDATE customers SET password_hash = $1
+           WHERE password_hash IS NOT NULL AND password_hash <> $1 AND password_hash NOT LIKE 'scrypt$%'`,
+          [LOCKED_PASSWORD]
+        );
+        console.log(`🔐 [Database] تم قفل ${legacyCount} حساباً كانت كلماته مخزّنة كنص صريح — يجب إعادة تعيينها.`);
+      }
+    } catch (legacyErr: any) {
+      console.warn('ℹ️ [Database] تعذّر فحص كلمات المرور القديمة:', legacyErr.message);
+    }
+
+    // تهيئة كلمة مرور المدير الأول من متغيّر البيئة (تُستخدم مرة واحدة فقط)
+    try {
+      const bootstrapPassword = process.env.INITIAL_ADMIN_PASSWORD;
+      if (bootstrapPassword && bootstrapPassword.length >= 8) {
+        const lockedAdmin = await client.query(
+          `SELECT id, email FROM users
+           WHERE role = 'admin' AND password_hash = $1
+           ORDER BY id ASC LIMIT 1`,
+          [LOCKED_PASSWORD]
+        );
+        if (lockedAdmin.rows.length > 0) {
+          const adminHash = await hashPassword(bootstrapPassword);
+          await client.query('UPDATE users SET password_hash = $1 WHERE id = $2', [
+            adminHash,
+            lockedAdmin.rows[0].id,
+          ]);
+          console.log(`🔐 [Database] تم ضبط كلمة مرور المدير الأول (${lockedAdmin.rows[0].email}) من INITIAL_ADMIN_PASSWORD`);
+        }
+      } else {
+        const lockedAdmins = await client.query(
+          `SELECT COUNT(*)::int AS n FROM users WHERE role = 'admin' AND password_hash = $1`,
+          [LOCKED_PASSWORD]
+        );
+        if ((lockedAdmins.rows[0]?.n || 0) > 0) {
+          console.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.warn('⚠️  يوجد حساب مدير مقفل بلا كلمة مرور.');
+          console.warn('👉  اضبط INITIAL_ADMIN_PASSWORD في ملف .env (8 أحرف على الأقل) ثم أعد تشغيل الخادم.');
+          console.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        }
+      }
+    } catch (bootErr: any) {
+      console.warn('ℹ️ [Database] تعذّر ضبط كلمة مرور المدير الأول:', bootErr.message);
     }
 
     isPostgresConnected = true;

@@ -180,7 +180,9 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
       counselorId: '',
       counselorName: '',
       counselorPhone: '',
-      portalPassword: '123456',
+      // ⛔ أُزيلت portalPassword: '123456' — لم يكن للواجهة أي حق في اختراع
+      // كلمة مرور بوابة. الخادم يولّد كلمة قوية عشوائية ويُشفّرها ويرسلها للطالب.
+      // الواجهة لا تعرف كلمة المرور ولا تحتاجها.
       notes: [`الوجهة: ${selectedCountry?.name_ar || 'بريطانيا'}`, `الجامعة: ${selectedUni?.name_ar || ''}`],
       documents: [
         { id: '1', category: 'passport', nameAr: 'جواز السفر ساري المفعول', nameEn: 'Valid Passport', status: 'pending', required: true },

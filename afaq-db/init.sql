@@ -157,7 +157,8 @@ CREATE TABLE IF NOT EXISTS applications (
     sponsor_type VARCHAR(100),
     status VARCHAR(50) DEFAULT 'under_review',
     stage_index INT DEFAULT 1,
-    portal_password VARCHAR(100) DEFAULT '123456',
+    -- ⚠️ '!' = مقفل بلا كلمة مرور (لا قيمة افتراضية قابلة للتخمين مثل 123456)
+    portal_password VARCHAR(100) DEFAULT '!',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

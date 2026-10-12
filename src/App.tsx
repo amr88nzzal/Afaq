@@ -14,7 +14,7 @@ import { CounselorBookingModal } from './components/CounselorBookingModal';
 import { NotificationToast, NotificationPayload } from './components/NotificationToast';
 import { MOCK_APPLICATIONS, TESTIMONIALS } from './data/mockData';
 import { DestinationCountry, Language, University, Theme, Application, CountryEntity, CMSParagraphEntity, DocumentItem } from './types';
-import { fetchCountriesAPI, getSiteSettings, fetchCMSParagraphsAPI, SiteSettings, uploadStudentDocumentAPI, deleteStudentDocumentAPI } from './services/api';
+import { fetchCountriesAPI, getSiteSettings, fetchCMSParagraphsAPI, SiteSettings, uploadStudentDocumentAPI, deleteStudentDocumentAPI, fetchPortalSessionAPI, logoutPortalAPI } from './services/api';
 import { getCountryFlag, getCountryFallbackImage } from './utils/countryHelper';
 import { 
   Award, 
@@ -128,13 +128,16 @@ export default function App() {
   const [isApplicationModalOpen, setIsApplicationModalOpen] = useState<boolean>(false);
   const [isCounselorBookingOpen, setIsCounselorBookingOpen] = useState<boolean>(false);
 
-  // Active student application for the portal demo
+  // Active student application for the portal
+  // ⛔ أُزيل الرجوع التلقائي إلى MOCK_APPLICATIONS[0].
+  // كان هذا يجعل بوابة الطالب "مسجَّلة الدخول" وهمياً عند أول زيارة فلا تظهر
+  // شاشة الدخول إطلاقاً. الآن: لا جلسة ⇒ لا طلب نشط.
+  // ولا تُخزَّن أي كلمة مرور محلياً (الخادم لا يُرسلها أصلاً).
   const [activeStudentApp, setActiveStudentApp] = useState<Application | null>(() => {
     try {
       const saved = localStorage.getItem('afaq_active_app');
       if (saved) {
         const parsed = JSON.parse(saved);
-        // If parsed contains legacy pre-filled documents where passport_mohammed.pdf was hardcoded, reset them to pending
         if (parsed?.documents?.some((d: any) => d.fileName === 'passport_mohammed.pdf' || d.fileName === 'passport_scan.pdf')) {
           const freshApp = {
             ...parsed,
@@ -146,8 +149,32 @@ export default function App() {
         return parsed;
       }
     } catch (e) {}
-    return MOCK_APPLICATIONS[0] || null;
+    return null;
   });
+
+  // التحقق من جلسة الطالب على الخادم — المصدر الوحيد للحقيقة.
+  // أي بيانات محفوظة في المتصفح لا قيمة لها بدون جلسة صالحة على السيرفر.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const session = await fetchPortalSessionAPI();
+      if (cancelled) return;
+      if (session.authenticated && session.data) {
+        setActiveStudentApp(session.data);
+        try {
+          localStorage.setItem('afaq_active_app', JSON.stringify(session.data));
+        } catch {}
+      } else {
+        setActiveStudentApp(null);
+        try {
+          localStorage.removeItem('afaq_active_app');
+        } catch {}
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Selected Logo Option (Option 1 was confirmed by user)
   const [selectedLogoId, setSelectedLogoId] = useState<number>(1);
@@ -779,7 +806,9 @@ export default function App() {
                 localStorage.setItem('afaq_active_app', JSON.stringify(app));
               } catch (e) {}
             }}
-            onLogout={() => {
+            onLogout={async () => {
+              // إبطال جلسة الطالب على الخادم فعلياً — لا يكفي مسح المتصفح
+              await logoutPortalAPI();
               setActiveStudentApp(null);
               try {
                 localStorage.removeItem('afaq_active_app');

@@ -108,9 +108,7 @@ INSERT INTO site_settings (key, value, updated_at) VALUES
 ('hero_title_ar', '${settings.hero_title_ar}', NOW()),
 ('hero_subtitle_ar', '${settings.hero_subtitle_ar}', NOW()),
 ('announcement_banner_ar', '${settings.announcement_banner_ar}', NOW()),
-('admin_notification_email', '${settings.admin_notification_email}', NOW()),
-('telegram_bot_token', '${settings.telegram_bot_token}', NOW()),
-('telegram_chat_id', '${settings.telegram_chat_id}', NOW())
+('admin_notification_email', '${settings.admin_notification_email}', NOW())
 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW();`;
   };
 
@@ -645,42 +643,15 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW();`;
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold mb-1.5 flex items-center gap-1.5">
-                    <Send className="w-3.5 h-3.5 text-blue-400" />
-                    <span>{isAr ? 'رمز توكن بوت تلغرام (Telegram Bot Token)' : 'Telegram Bot Token'}</span>
-                  </label>
-                  <input
-                    type="password"
-                    dir="ltr"
-                    placeholder="123456789:ABCdefGhIJKlmNoPQRstuVWXyz"
-                    value={settings.telegram_bot_token}
-                    onChange={(e) => handleChange('telegram_bot_token', e.target.value)}
-                    className={`w-full border rounded-xl p-2.5 text-xs font-mono focus:outline-none focus:border-amber-500 ${
-                      isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
-                    }`}
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">احصل عليه مجاناً عبر محادثة @BotFather</p>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold mb-1.5 flex items-center gap-1.5">
-                    <Send className="w-3.5 h-3.5 text-blue-400" />
-                    <span>{isAr ? 'معرف محادثة أو مجموعة تلغرام (Telegram Chat ID)' : 'Telegram Chat ID'}</span>
-                  </label>
-                  <input
-                    type="text"
-                    dir="ltr"
-                    placeholder="-1001234567890 أو 987654321"
-                    value={settings.telegram_chat_id}
-                    onChange={(e) => handleChange('telegram_chat_id', e.target.value)}
-                    className={`w-full border rounded-xl p-2.5 text-xs font-mono focus:outline-none focus:border-amber-500 ${
-                      isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
-                    }`}
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">معرف القناة أو القروب المستلم للتنبيهات</p>
-                </div>
+              {/* ⛔ أُزيلت حقول توكن تلغرام من الواجهة نهائياً.
+                  الأسرار لا تُخزَّن في قاعدة بيانات يقرأها المتصفح ولا تُحرَّر من العميل.
+                  تُضبط من متغيرات البيئة على السيرفر. */}
+              <div className={`p-3 rounded-xl border text-[11px] leading-relaxed ${
+                isDark ? 'border-slate-800 bg-slate-950/60 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-600'
+              }`}>
+                {isAr
+                  ? '🔒 إعدادات تلغرام (التوكن ومعرّف المحادثة) تُضبط الآن من متغيرات البيئة على السيرفر: TELEGRAM_BOT_TOKEN و TELEGRAM_CHAT_ID، ولا يمكن تعديلها أو قراءتها من المتصفح.'
+                  : '🔒 Telegram settings (bot token & chat id) are configured server-side via environment variables (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID) and can no longer be read or edited from the browser.'}
               </div>
             </div>
           )}

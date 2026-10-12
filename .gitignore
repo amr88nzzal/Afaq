@@ -4,10 +4,33 @@ dist/
 coverage/
 .DS_Store
 *.log
-.env*
+
+# ملفات البيئة — كلها، مع إبقاء النموذج فقط
+.env
+.env.*
 !.env.example
 
-# Persistent application data and uploaded documents
+# مفاتيح وشهادات (كانت غير مستثناة سابقاً)
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+service-account*.json
+secrets*
+credentials*
+*.netrc
+.npmrc
+
+# بيانات التطبيق والمستندات المرفوعة (تحتوي بيانات طلاب شخصية)
 server/data/
 public/uploads/
 uploads/
+*.sqlite
+*.db
+*.dump
+*.bak

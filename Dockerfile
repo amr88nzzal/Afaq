@@ -1,8 +1,14 @@
 # Multi-stage build for Afaq Global Education platform
 # ============================================================================
-# ملاحظة أمنية: أُضيف --sourcemap سابقاً إلى أمر البناء في package.json، وكان
-# dist/ يُخدَم كاملاً، فصار /server.cjs.map متاحاً للعامة ويكشف كود المصدر
-# الكامل للخادم. تمت إزالة --sourcemap من أمر البناء.
+# ملاحظات أمنية وإصلاحات:
+#   - أُزيل --sourcemap من أمر البناء في package.json، وكان dist/ يُخدَم
+#     كاملاً فصار /server.cjs.map متاحاً للعامة ويكشف كود المصدر الكامل.
+#   - أُزيل bun.lock لأن المشروع يُدار بـ npm وحده، وهذا يجعل npm ci ممكناً
+#     (بناء حتمي) بدل npm install.
+#   - الحاوية تعمل بمستخدم غير جذر.
+#   - 🐞 إصلاح: كان هذا الملف ينسخ dist/ و server.ts فقط، بينما الخادم يقرأ
+#     server/db/init.sql من القرص عند أول إقلاع. غيابه يعني أن قاعدة بيانات
+#     جديدة تُنشأ **بلا جداول**. أُضيف نسخ مجلد SQL.
 # ============================================================================
 FROM node:20-alpine AS builder
 
@@ -28,9 +34,11 @@ ENV PORT=3000
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Copy compiled frontend and server
+# Copy compiled frontend and server bundle
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/server.ts ./server.ts
+
+# ملفات تأسيس قاعدة البيانات — يقرأها server/db.ts عند أول إقلاع
+COPY --from=builder /app/server/db ./server/db
 
 # مجلد بيانات التطبيق + تشغيل بمستخدم غير جذر
 RUN mkdir -p /app/server/data/uploads/documents && chown -R node:node /app

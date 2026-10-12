@@ -8,11 +8,12 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=5000
 
-# نسخ ملف التعريف وتثبيت الاعتماديات
-# ملاحظة: npm install بدل npm ci لأن هذا المشروع يحتوي ملفَي قفل متعارضين
-# (package-lock.json و bun.lock). يُفضّل حذف bun.lock ثم استخدام npm ci.
-COPY package.json ./
-RUN npm install && npm install -g tsx
+# نسخ ملفَي القفل والاعتماديات معاً — شرط استخدام npm ci.
+# كان السابق ينسخ package.json فقط ويستخدم npm install (بناء غير حتمي)،
+# وbun.lock كان موجوداً بجانب package-lock.json فيزيد الالتباس.
+# تمت إزالة bun.lock لأن هذا المشروع يُدار بـ npm.
+COPY package.json package-lock.json ./
+RUN npm ci
 
 # نسخ ملفات الخادم وقواعد البيانات والخدمات والوسطاء
 COPY server.ts ./
@@ -33,5 +34,5 @@ USER node
 
 EXPOSE 5000
 
-# تشغيل خادم Express عبر tsx
-CMD ["tsx", "server.ts"]
+# استخدام tsx المحلي من devDependencies بدل تثبيت عام بـ npm install -g
+CMD ["npx", "tsx", "server.ts"]

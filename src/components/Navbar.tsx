@@ -98,9 +98,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   const cleanWhatsapp = rawWhatsapp.replace(/\D/g, '') || '966508765432';
   
   const announcementPara = cmsParagraphs?.find(p => p.slug === 'announcement' || p.slug === 'announcement_banner');
-  const announcementText = isAr 
-    ? (announcementPara?.text_ar || settings?.announcement_banner_ar || 'التسجيل مفتوح الآن للفصل الدراسي 2026/2027 مع منح تفوق تصل حتى 40% من الرسوم الدراسية')
-    : (announcementPara?.text_en || settings?.announcement_banner_en || 'Admissions now open for 2026/2027 intakes with merit scholarships up to 40% tuition reduction');
+  // مصدر الحقيقة لشريط التنبيه هو الإعدادات (settings)، والفقرة احتياطية فقط.
+  // كان الترتيب معكوساً: الفقرة أولاً، وهي مخزَّنة في جدول paragraphs منفصل،
+  // ولأن مزامنة الإعدادات لم تكن تكتب في ذلك الجدول بقي نص قديم معروضاً.
+  // (حدث فعلاً على الموقع الحيّ: الشريط عرض 55% بينما الإعدادات تقول 40%.)
+  const announcementText = isAr
+    ? (settings?.announcement_banner_ar || announcementPara?.text_ar || 'التسجيل مفتوح الآن للفصل الدراسي 2026/2027 مع منح تفوق تصل حتى 40% من الرسوم الدراسية')
+    : (settings?.announcement_banner_en || announcementPara?.text_en || 'Admissions now open for 2026/2027 intakes with merit scholarships up to 40% tuition reduction');
 
   return (
     <header className={`sticky top-0 z-50 border-b shadow-md transition-colors duration-200 ${
@@ -108,29 +112,33 @@ export const Navbar: React.FC<NavbarProps> = ({
         ? 'bg-slate-950/95 border-slate-800 text-white backdrop-blur-md' 
         : 'bg-white/95 border-slate-200 text-slate-900 backdrop-blur-md'
     }`}>
-      {/* Top Banner: Gulf direct helpline & 100% Free Placement Guarantees */}
+      {/* شريط التنبيه العلوي: الإعلان + واتساب الاستشارات المباشر */}
       <div className="bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 text-xs font-semibold py-1.5 px-4">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center sm:justify-between gap-x-4 gap-y-1">
+
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-950 text-amber-300 text-[10px] font-black">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-950 text-amber-300 text-xs font-black whitespace-nowrap">
               {isAr ? 'مجاني 100%' : '100% FREE'}
             </span>
-            <span className="font-bold">
-              {announcementText}
-            </span>
+            <span className="font-bold">{announcementText}</span>
           </div>
-          <div className="flex items-center gap-4 text-[11px]">
-            <a 
-              href={`https://wa.me/${cleanWhatsapp}`} 
-              target="_blank" 
-              rel="noreferrer" 
-              className="hover:underline flex items-center gap-1 font-black text-slate-950"
+
+          <div className="flex items-center gap-3">
+            <a
+              href={`https://wa.me/${cleanWhatsapp}`}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={isAr ? `تواصل معنا على واتساب ${rawWhatsapp}` : `Contact us on WhatsApp ${rawWhatsapp}`}
+              className="hover:underline inline-flex items-center gap-1.5 font-black text-slate-950 text-xs min-h-[44px] py-1"
             >
-              <MessageCircle className="w-3.5 h-3.5 fill-current" />
-              <span>{isAr ? `واتساب الاستشارات المباشر: ${rawWhatsapp}` : `Direct Advisor WhatsApp: ${rawWhatsapp}`}</span>
+              <MessageCircle className="w-4 h-4 fill-current shrink-0" aria-hidden="true" />
+              <span>{isAr ? 'واتساب الاستشارات:' : 'Advisor WhatsApp:'}</span>
+              {/* dir="ltr" ضروري: بدونه يظهر الرقم وعلامة + معكوسين (491556009968+ بدل +491556009968) */}
+              <span dir="ltr" className="inline-block tabular-nums">{rawWhatsapp.trim()}</span>
             </a>
-            <span className="hidden sm:inline opacity-60">|</span>
-            <span className="hidden sm:inline font-bold">
+
+            <span className="hidden lg:inline opacity-60" aria-hidden="true">|</span>
+            <span className="hidden lg:inline font-bold">
               {isAr ? '🇸🇦 🇰🇼 🇦🇪 معتمدون لبرامج الابتعاث الحكومي' : 'GCC Scholarship Approved'}
             </span>
           </div>
@@ -231,16 +239,17 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               onClick={onOpenApplicationModal}
               id="header-apply-button"
-              className="px-4 py-2 rounded-xl text-xs font-black bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 shadow-md shadow-amber-500/20 transition-transform active:scale-95 flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 rounded-xl text-xs font-black bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 shadow-md shadow-amber-500/20 transition-transform active:scale-95 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
             >
-              <GraduationCap className="w-4 h-4" />
-              <span>{isAr ? 'قدم طلب قبول مجاني 100%' : 'Apply Free 100%'}</span>
+              <GraduationCap className="w-4 h-4" aria-hidden="true" />
+              <span>{isAr ? 'قدم طلبك مجاناً' : 'Apply Free'}</span>
             </button>
 
             {/* Theme Toggle (Sun/Moon) */}
             <button
               onClick={onToggleTheme}
               id="theme-toggle-btn"
+              aria-label={isDark ? (isAr ? 'تفعيل الوضع الفاتح' : 'Switch to light mode') : (isAr ? 'تفعيل الوضع الداكن' : 'Switch to dark mode')}
               className={`p-2 rounded-xl border text-xs font-bold transition-colors ${
                 isDark ? 'bg-slate-900 border-slate-800 text-amber-400 hover:bg-slate-800' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
               }`}
@@ -253,6 +262,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               onClick={handleToggleContrast}
               id="contrast-toggle-btn"
+              aria-label={isAr ? 'تفعيل وضع التباين العالي' : 'Toggle high contrast mode'}
+              aria-pressed={contrastMode === 'high'}
               className={`p-2 rounded-xl border text-xs font-bold transition-colors relative group ${
                 contrastMode === 'high'
                   ? 'bg-amber-500/20 border-amber-500/50 text-amber-500'
@@ -273,6 +284,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               onClick={onToggleLang}
               id="language-toggle-btn"
+              aria-label={isAr ? 'Switch to English' : 'التحويل إلى العربية'}
               className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-1 transition-colors ${
                 isDark ? 'bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-800' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
               }`}
@@ -283,39 +295,41 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </div>
 
-          {/* Mobile Hamburger & Quick Theme */}
-          <div className="flex lg:hidden items-center gap-2">
+          {/* أزرار الجوال: كل هدف لمس ≥ 44×44px (توصية Apple HIG) مع aria-label */}
+          <div className="flex lg:hidden items-center gap-1.5">
             <button
               onClick={onToggleTheme}
-              className={`p-2 rounded-xl border ${
+              aria-label={isDark ? (isAr ? 'تفعيل الوضع الفاتح' : 'Switch to light mode') : (isAr ? 'تفعيل الوضع الداكن' : 'Switch to dark mode')}
+              className={`min-h-11 min-w-11 flex items-center justify-center rounded-xl border ${
                 isDark ? 'bg-slate-900 border-slate-800 text-amber-400' : 'bg-slate-100 border-slate-200 text-slate-700'
               }`}
             >
-              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
 
-            {/* Mobile Contrast Mode Toggle */}
             <button
               onClick={handleToggleContrast}
-              className={`p-2 rounded-xl border relative ${
+              aria-label={isAr ? 'تفعيل وضع التباين العالي' : 'Toggle high contrast mode'}
+              aria-pressed={contrastMode === 'high'}
+              className={`min-h-11 min-w-11 flex items-center justify-center rounded-xl border relative ${
                 contrastMode === 'high'
                   ? 'bg-amber-500/20 border-amber-500/50 text-amber-500'
-                  : isDark ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-650'
+                  : isDark ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-600'
               }`}
-              title={isAr ? 'وضعية التباين العالي الفائقة' : 'High Contrast Mode'}
             >
-              <Eye className="w-4 h-4" />
+              <Eye className="w-5 h-5" />
               {contrastMode === 'high' && (
-                <span className="absolute -top-0.5 -right-0.5 flex h-1.5 w-1.5">
+                <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                 </span>
               )}
             </button>
 
             <button
               onClick={onToggleLang}
-              className={`p-2 rounded-xl border text-xs font-bold ${
+              aria-label={isAr ? 'Switch to English' : 'التحويل إلى العربية'}
+              className={`min-h-11 min-w-11 flex items-center justify-center rounded-xl border text-xs font-bold ${
                 isDark ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-slate-100 border-slate-200 text-slate-700'
               }`}
             >
@@ -324,7 +338,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className={`p-2 rounded-xl border ${
+              aria-label={isAr ? (mobileMenuOpen ? 'إغلاق القائمة' : 'فتح القائمة') : (mobileMenuOpen ? 'Close menu' : 'Open menu')}
+              aria-expanded={mobileMenuOpen}
+              className={`min-h-11 min-w-11 flex items-center justify-center rounded-xl border ${
                 isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-100 border-slate-200 text-slate-900'
               }`}
             >

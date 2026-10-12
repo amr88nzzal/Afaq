@@ -174,7 +174,7 @@ export const DestinationsSection: React.FC<DestinationsSectionProps> = ({
                 <div className={`p-3.5 rounded-2xl border space-y-1 ${
                   isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-50 border-slate-200'
                 }`}>
-                  <div className="text-slate-400 text-[11px] flex items-center gap-1">
+                  <div className="text-slate-400 text-xs flex items-center gap-1">
                     <Coins className="w-3.5 h-3.5 text-amber-500" />
                     <span>{isAr ? 'تكاليف الدراسة التقريبية' : 'Tuition Estimate'}</span>
                   </div>
@@ -186,7 +186,7 @@ export const DestinationsSection: React.FC<DestinationsSectionProps> = ({
                 <div className={`p-3.5 rounded-2xl border space-y-1 ${
                   isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-50 border-slate-200'
                 }`}>
-                  <div className="text-slate-400 text-[11px] flex items-center gap-1">
+                  <div className="text-slate-400 text-xs flex items-center gap-1">
                     <Building2 className="w-3.5 h-3.5 text-blue-500" />
                     <span>{isAr ? 'المعيشة والسكن' : 'Living Expenses'}</span>
                   </div>
@@ -198,7 +198,7 @@ export const DestinationsSection: React.FC<DestinationsSectionProps> = ({
                 <div className={`p-3.5 rounded-2xl border space-y-1 ${
                   isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-50 border-slate-200'
                 }`}>
-                  <div className="text-slate-400 text-[11px] flex items-center gap-1">
+                  <div className="text-slate-400 text-xs flex items-center gap-1">
                     <Briefcase className="w-3.5 h-3.5 text-emerald-500" />
                     <span>{isAr ? 'تأشيرة العمل بعد التخرج' : 'Post-Study Visa'}</span>
                   </div>
@@ -240,7 +240,7 @@ export const DestinationsSection: React.FC<DestinationsSectionProps> = ({
                   <FileText className="w-3.5 h-3.5 text-amber-500" />
                   <span>{isAr ? 'المتطلبات الأساسية للقبول في هذه الدولة:' : 'General Admission Requirements:'}</span>
                 </h4>
-                <div className="flex flex-wrap gap-2 text-[11px]">
+                <div className="flex flex-wrap gap-2 text-xs">
                   {(staticData?.admissionRequirementsAr && isAr ? staticData.admissionRequirementsAr : [
                     isAr ? 'الشهادة الثانوية أو البكالوريوس وكشف الدرجات' : 'Academic transcripts & certificate',
                     isAr ? 'شهادة إجادة اللغة الإنجليزية (IELTS / TOEFL / Duolingo)' : 'English Proficiency (IELTS/TOEFL)',

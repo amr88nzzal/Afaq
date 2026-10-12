@@ -53,10 +53,10 @@ export const LogoRenderer: React.FC<LogoRendererProps> = ({
               </span>
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className={`text-[10px] font-black tracking-widest uppercase ${isDark ? 'text-amber-300/90' : 'text-amber-600'}`}>
+              <span className={`text-xs font-black tracking-widest uppercase ${isDark ? 'text-amber-300/90' : 'text-amber-600'}`}>
                 AFAQ GLOBAL
               </span>
-              <span className="text-[9px] text-slate-400 font-medium hidden sm:inline">
+              <span className="text-xs text-slate-400 font-medium hidden sm:inline">
                 • Education & Migration
               </span>
             </div>
@@ -85,7 +85,7 @@ export const LogoRenderer: React.FC<LogoRendererProps> = ({
               <span className={`text-xl font-bold ${isDark ? 'text-white' : 'text-[#0B2545]'}`}>
                 AFAQ GLOBAL
               </span>
-              <span className="text-[11px] font-medium text-amber-600">
+              <span className="text-xs font-medium text-amber-600">
                 استشارات القبولات الدولية
               </span>
             </div>
@@ -113,7 +113,7 @@ export const LogoRenderer: React.FC<LogoRendererProps> = ({
               <span className={`text-2xl font-black ${isDark ? 'text-white' : 'text-[#0B2545]'}`}>
                 آفـاق <span className="text-teal-600 text-lg">GLOBAL</span>
               </span>
-              <span className="text-[10px] text-slate-500 font-semibold">
+              <span className="text-xs text-slate-500 font-semibold">
                 EDUCATION & MIGRATION
               </span>
             </div>
@@ -143,7 +143,7 @@ export const LogoRenderer: React.FC<LogoRendererProps> = ({
               <span className={`text-xl font-black bg-gradient-to-r from-amber-400 via-amber-200 to-amber-500 bg-clip-text text-transparent`}>
                 آفاق العالمية
               </span>
-              <span className="text-[10px] font-bold text-amber-500/80 tracking-widest uppercase">
+              <span className="text-xs font-bold text-amber-500/80 tracking-widest uppercase">
                 AFAQ ROYAL GLOBAL
               </span>
             </div>
@@ -169,7 +169,7 @@ export const LogoRenderer: React.FC<LogoRendererProps> = ({
               <span className={`text-xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 بوابة آفاق
               </span>
-              <span className="text-[10px] font-bold text-emerald-500">
+              <span className="text-xs font-bold text-emerald-500">
                 AFAQ GLOBAL ACADEMIC GATEWAY
               </span>
             </div>
@@ -193,7 +193,7 @@ export const LogoRenderer: React.FC<LogoRendererProps> = ({
               <span className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 آفاق العالمية
               </span>
-              <span className="text-[10px] text-amber-600 font-bold uppercase">
+              <span className="text-xs text-amber-600 font-bold uppercase">
                 AFAQ GLOBAL EMBLEM
               </span>
             </div>
@@ -220,7 +220,7 @@ export const LogoRenderer: React.FC<LogoRendererProps> = ({
               <span className={`text-2xl font-black ${isDark ? 'text-white' : 'text-[#0B3C68]'}`}>
                 آفـاق للتعليم
               </span>
-              <span className="text-[10px] font-bold text-amber-600 tracking-wider">
+              <span className="text-xs font-bold text-amber-600 tracking-wider">
                 AFAQ EDUCATION PATH
               </span>
             </div>
